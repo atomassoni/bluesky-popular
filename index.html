@@ -93,7 +93,7 @@
                   class="block mt-2 text-gray-700 whitespace-pre-wrap hover:underline"
                   x-text="tweet.content"
                 ></a>
-           
+
                 <!-- Images -->
                 <div class="mt-2" x-show="tweet.images?.length > 0">
                   <template x-for="image in tweet.images" :key="image">
@@ -168,9 +168,9 @@
                 </template>
                 <!-- Like counter -->
                 <p
-                class="text-sm text-gray-500"
-                x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'"
-              ></p>
+                  class="text-sm text-gray-500"
+                  x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'"
+                ></p>
               </div>
             </div>
           </div>
@@ -286,7 +286,7 @@
               //         "cid": "bafyreibt6336yr7h4wfi7abjpgg334qmpigxqm7bgvczzkks3ft7he4dnq"
               //     }
               // }
-              if (this.counter % 1000 == 0) {
+              if (this.counter % 5000 == 0) {
                 const trackedProperNouns = Object.entries(this.likeTracker)
                   .map(([link, post]) => ({ link, ...post }))
                   .sort((a, b) => b.likeCount - a.likeCount);
@@ -314,7 +314,7 @@
                   });
                   const parentProfile = await this.getProfile(repo);
                   const { handle, avatar, displayName } = parentProfile;
-console.log({reply})
+                  console.log({ reply });
                   const post = reply?.value;
                   if (!post) return;
                   const { embed } = post;
@@ -367,10 +367,7 @@ console.log({reply})
 
                   const { likeCount, timesUs } = this.likeTracker[uri];
                   this.likeTracker[uri] = { ...newTweet, likeCount, timesUs };
-                  // this.tweets.unshift(newTweet);
-                  // if (this.tweets.length > 200) {
-                  //   this.tweets.pop();
-                  // }
+                 
                 } catch (err) {
                   console.error(err);
                 }

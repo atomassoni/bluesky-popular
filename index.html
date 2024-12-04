@@ -20,8 +20,13 @@
   <body class="bg-gray-100 min-h-screen flex items-center justify-center">
     <div x-data="tweetFeed()" class="w-full max-w-2xl p-4">
       <!-- Heading -->
-      <h1 class="text-2xl font-bold mb-4 text-gray-800">Popular posts</h1>
-
+      <h1 x-show="tweets?.length" class="text-2xl font-bold mb-4 text-gray-800">Popular posts</h1>
+      <h1 
+      x-show="!tweets?.length" 
+      class="text-2xl font-bold mb-4 text-gray-800 animate-pulse">
+      Gathering the LIKES
+  </h1>
+  
       <!-- Tweets List -->
       <div>
         <template x-for="tweet in tweets" :key="tweet.id">

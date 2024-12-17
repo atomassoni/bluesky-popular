@@ -75,44 +75,44 @@
 
               <!-- Main Tweet -->
               <div>
-                <div class="flex items-start mb-2">
-                  <!-- Avatar -->
-                  <a
-                    :href="tweet.profileUrl"
-                    target="_blank"
-                    class="mr-4 flex-shrink-0"
-                  >
-                    <img
-                      :src="tweet.avatar || 'https://via.placeholder.com/50'"
-                      alt="Avatar"
-                      class="w-8 h-8 rounded-full"
-                    />
-                  </a>
-
-                  <!-- Name and handle -->
-                  <div class="flex-1">
-                    <div class="flex justify-between items-start">
-                      <div>
-                        <a
-                          :href="tweet.profileUrl"
-                          target="_blank"
-                          class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
-                          x-text="tweet.userName"
-                        ></a>
-                        <p
-                          class="text-sm text-gray-500 dark:text-gray-400"
-                          x-text="'@' + tweet.userHandle"
-                        ></p>
-                      </div>
-
-                      <!-- Timestamp -->
+                <div class="flex justify-between items-start mb-2">
+                  <!-- Left section (avatar, username, handle) -->
+                  <div class="flex items-center">
+                    <!-- Avatar -->
+                    <a
+                      :href="tweet.profileUrl"
+                      target="_blank"
+                      class="mr-4 flex-shrink-0"
+                    >
+                      <img
+                        :src="tweet.avatar || 'https://via.placeholder.com/50'"
+                        alt="Avatar"
+                        class="w-8 h-8 rounded-full"
+                      />
+                    </a>
+                    
+                    <!-- Name and handle (vertically centered) -->
+                    <div class="flex flex-col justify-center">
+                      <a
+                        :href="tweet.profileUrl"
+                        target="_blank"
+                        class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                        x-text="tweet.userName"
+                      ></a>
                       <p
-                        class="text-sm text-gray-400"
-                        x-text="tweet.timestamp"
+                        class="text-sm text-gray-500 dark:text-gray-400"
+                        x-text="'@' + tweet.userHandle"
                       ></p>
                     </div>
                   </div>
+                  
+                  <!-- Right section (timestamp), aligned to top -->
+                  <p
+                    class="text-sm text-gray-400"
+                    x-text="tweet.timestamp"
+                  ></p>
                 </div>
+                
 
                 <!-- Tweet Content (Full Width) -->
                 <a

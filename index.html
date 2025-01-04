@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Current Top Posts</title>
-  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.2/dist/cdn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
 
   <script type="module">
@@ -25,13 +25,13 @@
       Gathering the LIKES
     </h1>
 
-    <div x-data="tweetFeed()" class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
+    <div class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
       <!-- Tweets List -->
       <div>
-        <template x-for="tweet in tweets" :key="tweet.id">
+        <template x-for="tweet in tweets" >
           <!-- Summary Line -->
 
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4" :key="tweet.id">
             <!-- Parent Tweet -->
             <template x-if="tweet.parent">
               <div
@@ -124,34 +124,35 @@
                 </div>
               </template>
 
-                          <!-- Quote Tweet -->
-            <template x-if="tweet.quotePost">
-              <div
-                class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2 flex items-start">
-                <!-- Parent Tweet Avatar -->
-                <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
-                  class="w-6 h-6 rounded-full mr-3" />
-                <!-- Parent Tweet Content -->
-                <div class="flex-1">
-                  <p class="font-semibold text-gray-600 dark:text-gray-300">
-                    <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
-                    <span class="text-sm text-gray-500 dark:text-gray-400"
-                      x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
-                  </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
-                    x-text="tweet.quotePost.record.text || 'Parent tweet not available'"></p>
+              <!-- Quote Tweet -->
+              <template x-if="tweet.quotePost">
+                <div
+                  class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2 flex items-start">
+                  <!-- Parent Tweet Avatar -->
+                  <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                    class="w-6 h-6 rounded-full mr-3" />
+                  <!-- Parent Tweet Content -->
+                  <div class="flex-1">
+                    <p class="font-semibold text-gray-600 dark:text-gray-300">
+                      <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                      <span class="text-sm text-gray-500 dark:text-gray-400"
+                        x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                      x-text="tweet.quotePost.record.text || 'Parent tweet not available'"></p>
+                  </div>
                 </div>
-              </div>
-            </template>
+              </template>
               <!-- other counters -->
               <p class="text-sm text-gray-600 flex justify-between items-center space-x-4">
-                <span>Likes: <span x-text="tweet.totalLikeCount + tweet.likeCount"></span></span>
+                <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
                 <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                 <span>Replies: <span x-text="tweet.replyCount"></span></span>
                 <span>Reposts: <span x-text="tweet.repostCount"></span></span>
               </p>
               <!-- Like counter -->
-              <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'"></p>
+              <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
+              </p>
 
             </div>
           </div>
@@ -222,6 +223,7 @@
               this.likeTracker[uri] = { likeCount: 0, timesUs: [time_us] };
             }
             this.likeTracker[uri].timesUs.push(time_us);
+            this.likeTracker[uri].totalLikeCount ? this.likeTracker[uri].totalLikeCount++ : 1;
             this.likeTracker[uri].timesUs =
               this.likeTracker[uri].timesUs.filter(
                 (postTime) => postTime > oneMinuteAgo
@@ -354,12 +356,13 @@
                       newTweet.external.hostname = new URL(uri).hostname;
                     }
                   } else if (embed.$type == "app.bsky.embed.video") {
+                    console.log("video", {embed})
                     newTweet.images = [
                       "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
                     ];
                   } else if (embed.$type == "app.bsky.embed.record") {
                     const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
-                    console.log({quotedPost})
+                    console.log({ quotedPost })
                     newTweet.quotePost = quotedPost
                   } else {
                     console.log({ embed });
@@ -430,7 +433,7 @@
           const url = `https://bsky.social/xrpc/com.atproto.sync.getBlob?${queryParams}`;
           const imageBlob = await fetchFrom(url, "blob");
           return imageBlob;
-        },
+        }
       };
     }
     async function fetchFrom(url, type = "application/json") {

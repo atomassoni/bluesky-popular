@@ -28,10 +28,10 @@
     <div class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
       <!-- Tweets List -->
       <div>
-        <template x-for="tweet in tweets" >
+        <template x-for="tweet in tweets" :key="tweet.id">
           <!-- Summary Line -->
 
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4" :key="tweet.id">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
             <!-- Parent Tweet -->
             <template x-if="tweet.parent">
               <div
@@ -273,8 +273,8 @@
               const tweets = (
                 trackedProperNouns[numToTrack]?.content
                   ? trackedProperNouns.slice(0, numToTrack)
-                  : trackedProperNouns.slice().filter((r) => r.content)
-              ).sort((a, b) => a.counter - b.counter);
+                  : trackedProperNouns.slice()
+              ).filter((r) => r.content).sort((a, b) => a.counter - b.counter);
 
               this.tweets = tweets;
               if (this.counter % 5000 == 0) {

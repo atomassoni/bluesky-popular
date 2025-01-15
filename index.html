@@ -175,6 +175,7 @@
         firstLoad: Date.now() * 1000,
         latestTimeUs: 0,
         numSeconds: 60,
+        collections: {},
         async init() {
           this.addVisibilityListeners();
           this.startWebsocket();
@@ -247,12 +248,16 @@
           this.showOnlyUri = undefined;
           this.tweets = this.allPosts
         },
-        startWebsocket() {
+        startWebsocket(q) {
+          const queryString = window.location.search;
+          const urlParams = new URLSearchParams(queryString);
+          const wantedCollections = urlParams.get("q") || 'app.bsky.feed.like'
+          console.log({ wantedCollections })
           if (this.websocket) {
             this.websocket.close();
           }
           this.websocket = new WebSocket(
-            "wss://jetstream2.us-east.bsky.network/subscribe\?wantedCollections=app.bsky.feed.like"
+            `wss://jetstream2.us-east.bsky.network/subscribe\?wantedCollections=${wantedCollections}`
           );
 
           this.websocket.onopen = () => {
@@ -277,7 +282,10 @@
 
             // console.log(data)
             if (!commit) return;
-            const { operation, cid, record, rkey } = commit || {};
+
+            const { operation, cid, record, rkey, collection } = commit || {};
+            // this.collections[collection] = true
+            // console.log("collections", Object.keys(this.collections))
 
             if (operation != "create") {
               return;
@@ -380,8 +388,7 @@
 
                 const reply = (await this.getPosts(uri))?.posts[0]
                 const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = reply || {}
-
-                const { handle, avatar, displayName } = author || {};
+                const { handle, avatar, displayName  } = author || {};
                 console.log({ reply });
                 if (!record) return;
                 if (labels.length) {

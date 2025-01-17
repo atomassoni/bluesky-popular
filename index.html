@@ -17,7 +17,8 @@
 </head>
 
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center">
-  <div x-data="tweetFeed" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200">
+  <div x-data="tweetFeed" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
+    @scroll.window.throttle.1000ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" id="chart"></div>
 
     <!-- Heading -->
@@ -175,6 +176,7 @@
         firstLoad: Date.now() * 1000,
         latestTimeUs: 0,
         numSeconds: 60,
+        numToTrack: 25,
         collections: {},
         async init() {
           this.addVisibilityListeners();
@@ -187,6 +189,22 @@
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
+        checkScroll() {
+          const scrollPosition = window.innerHeight + window.scrollY;
+          const bottomPosition = document.documentElement.offsetHeight;
+          // Trigger loadMore if close to the bottom
+          if (scrollPosition >= bottomPosition - 100 && this.tweets.length >= this.numToTrack) {
+            this.loadMore();
+          }
+        },
+        async loadMore() {
+          console.log("load", this.numToTrack);
+
+          this.numToTrack += 5;
+
+          this.tweets = this.allPosts.slice(0, this.numToTrack)
+        },
+
         chartIt() {
           var options = {
             series: [],
@@ -246,7 +264,7 @@
         showOnlyUri: undefined,
         resetTweets() {
           this.showOnlyUri = undefined;
-          this.tweets = this.allPosts
+          this.tweets = this.allPosts.slice(0, this.numToTrack)
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -353,34 +371,26 @@
                     })
                     : null,
                 }))
-                .sort((a, b) => b.likeCount - a.likeCount);
-              console.log(trackedProperNouns);
-              const numToTrack = 81;
-              const tweets = trackedProperNouns.slice(0, numToTrack)
-                .filter((r) => r.content).map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [], hide: trackedProperNouns.some(tp => tp.hide) }))
+              // .sort((a, b) => b.likeCount - a.likeCount);
+              console.log("count length", trackedProperNouns.length);
+              const tweets = trackedProperNouns
+                .filter((r) => r.content).map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }))
 
                 .sort((a, b) => a.counter - b.counter);
               if (!this.showOnlyUri) {
-
-                this.tweets = tweets;
-
+                this.tweets = tweets.slice(0, this.numToTrack)
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
               this.allPosts = tweets;
-              console.log({ tweets })
-              const series = tweets.slice(0, 25).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data)
+
+              // console.log({ tweets })
+              const series = tweets.map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
               this.chart.updateSeries(series)
 
 
-              if (this.counter % 5000 == 0) {
-                this.likeTracker = {};
-                for (const tpNoun of trackedProperNouns.slice(0, 1000)) {
-                  const { link, ...rest } = tpNoun;
-                  this.likeTracker[link] = rest;
-                }
-              }
+
             }
             if (this.likeTracker[uri]?.likeCount == 10) {
               const [_, __, repo, collection, rkey] = uri.split("/");
@@ -388,7 +398,7 @@
 
                 const reply = (await this.getPosts(uri))?.posts[0]
                 const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = reply || {}
-                const { handle, avatar, displayName  } = author || {};
+                const { handle, avatar, displayName } = author || {};
                 console.log({ reply });
                 if (!record) return;
                 if (labels.length) {
@@ -459,16 +469,35 @@
 
                   }
                 }
-
-                const { likeCount, timesUs } = this.likeTracker[uri];
-                this.likeTracker[uri] = {
-                  ...newTweet,
-                  likeCount,
-                  timesUs,
-                  counter: this.counter,
-                };
+                if (this.likeTracker[uri]) {
+                  const { likeCount, timesUs } = this.likeTracker[uri];
+                  this.likeTracker[uri] = {
+                    ...newTweet,
+                    likeCount,
+                    timesUs,
+                    counter: this.counter,
+                  };
+                }
               } catch (err) {
                 console.error(err);
+              }
+
+            }
+
+            if (this.counter % 5000 == 0) {
+              // this.likeTracker = {};
+              // for (const tpNoun of tweets.slice(0, 1000)) {
+              //   const { link, ...rest } = tpNoun;
+              //   this.likeTracker[link] = rest;
+              // }
+              let newCount = 0
+              for (const uri in this.likeTracker) {
+                if (this.likeTracker[uri]?.likeCount<5 || newCount > 1000
+                ) {
+                  delete this.likeTracker[uri]
+                } else {
+                  newCount++
+                }
               }
             }
           };

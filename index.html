@@ -177,6 +177,7 @@
         latestTimeUs: 0,
         numSeconds: 60,
         numToTrack: 25,
+        calculating: false,
         collections: {},
         async init() {
           this.addVisibilityListeners();
@@ -483,8 +484,10 @@
               }
 
             }
+            if (Date.now() % 10000 == 0 && !this.calculating) {
+              this.calculating = true
+              console.log("Date.now", Date.now() )
 
-            if (this.counter % 5000 == 0) {
               // this.likeTracker = {};
               // for (const tpNoun of tweets.slice(0, 1000)) {
               //   const { link, ...rest } = tpNoun;
@@ -492,13 +495,14 @@
               // }
               let newCount = 0
               for (const uri in this.likeTracker) {
-                if (this.likeTracker[uri]?.likeCount<5 || newCount > 1000
+                if ((!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount<5) || newCount > 1000
                 ) {
                   delete this.likeTracker[uri]
                 } else {
                   newCount++
                 }
               }
+              this.calculating = false
             }
           };
         },

@@ -13,19 +13,58 @@
     import { formatDistanceToNowStrict } from "https://esm.sh/date-fns/formatDistanceToNowStrict.mjs";
     window.format = formatDistanceToNowStrict;
   </script>
+  <style>
+    [x-cloak] {
+      display: none !important;
+    }
+  </style>
   <!-- <script type="module" src="./dist/bundle.js"></script> -->
 </head>
 
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center">
   <div x-data="tweetFeed" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
-    @scroll.window.throttle.1000ms="checkScroll" class="min-h-screen">
+    @scroll.window.throttle.250ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" id="chart"></div>
 
     <!-- Heading -->
-    <h1 x-show="tweets?.length" class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200">
-      Popular posts
-    </h1>
-    <h1 x-show="!tweets?.length" class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 animate-pulse">
+    <div x-cloak x-show="tweets?.length" class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200">
+        Popular posts
+      </h1>
+      <!-- Vertical dot menu -->
+      <div class="relative" x-data="{ open: false }">
+        <!-- Button to toggle menu -->
+        <button @click="open = !open" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800 dark:text-gray-200" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v.01M12 12v.01M12 18v.01" />
+          </svg>
+        </button>
+
+        <!-- Dropdown menu -->
+        <div x-show="open" @click.away="open = false"
+          class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50"
+          x-cloak>
+          <ul class="py-1">
+            <li>
+              <p @click="sortHighToLow('likeCount')"
+                class="block px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Sort By Popularity
+              </p>
+            </li>
+            <li>
+              <p @click="sortLowToHigh('postorder')"
+                class="block px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Sort By Default
+              </p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h1 x-cloak x-show="!tweets?.length"
+      class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 animate-pulse">
       Gathering the LIKES
     </h1>
 
@@ -163,6 +202,10 @@
         </template>
       </div>
     </div>
+    <p x-cloak x-show="loader"
+      class=" font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+      loading...
+    </p>
   </div>
   <script>
     function tweetFeed() {
@@ -172,12 +215,15 @@
         websocket: null,
         likeTracker: {},
         counter: 0,
+        postorder: 0,
+        loader: false,
         currentTime: Date.now() * 1000,
         firstLoad: Date.now() * 1000,
         latestTimeUs: 0,
         numSeconds: 60,
         numToTrack: 25,
         calculating: false,
+        sortField: 'postorder',
         collections: {},
         async init() {
           this.addVisibilityListeners();
@@ -190,19 +236,31 @@
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
+        sortHighToLow(postField) {
+          this.sortField = postField
+          this.allPosts.sort((a, b) => b[postField] - a[postField]);
+          this.tweets = this.allPosts.slice(0, this.numToTrack);
+        },
+        sortLowToHigh(postField) {
+          this.sortField = postField
+          this.allPosts.sort((a, b) => a[postField] - b[postField]);
+          this.tweets = this.allPosts.slice(0, this.numToTrack);
+        },
         checkScroll() {
           const scrollPosition = window.innerHeight + window.scrollY;
           const bottomPosition = document.documentElement.offsetHeight;
-          // Trigger loadMore if close to the bottom
+
           if (scrollPosition >= bottomPosition - 100 && this.tweets.length >= this.numToTrack) {
-            this.loadMore();
+            this.loader = true
+            setTimeout(() => {
+              this.loadMore();
+              this.loader = false;
+            }, 1000)
           }
         },
         async loadMore() {
           console.log("load", this.numToTrack);
-
           this.numToTrack += 5;
-
           this.tweets = this.allPosts.slice(0, this.numToTrack)
         },
 
@@ -249,7 +307,7 @@
             },
             xaxis: {
               type: 'datetime',
-
+      
             },
 
             legend: {
@@ -265,7 +323,7 @@
         showOnlyUri: undefined,
         resetTweets() {
           this.showOnlyUri = undefined;
-          this.tweets = this.allPosts.slice(0, this.numToTrack)
+          this.sortField == 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -281,7 +339,7 @@
 
           this.websocket.onopen = () => {
             setInterval(() => {
-              this.websocket.send(JSON.stringify({ ping: "pong" }));
+              this.websocket?.send(JSON.stringify({ ping: "pong" }));
             }, 40_000);
           };
 
@@ -374,21 +432,22 @@
                 }))
               // .sort((a, b) => b.likeCount - a.likeCount);
               console.log("count length", trackedProperNouns.length);
-              const tweets = trackedProperNouns
-                .filter((r) => r.content).map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }))
+              let tweets = trackedProperNouns
+                .filter((r) => r.content)
+                .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }))
+              this.allPosts = tweets;
 
-                .sort((a, b) => a.counter - b.counter);
               if (!this.showOnlyUri) {
-                this.tweets = tweets.slice(0, this.numToTrack)
+                this.sortField === 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
-              this.allPosts = tweets;
-
+              console.log("top 3", tweets.slice(0, 3))
               // console.log({ tweets })
               const series = tweets.map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
               this.chart.updateSeries(series)
+              this.checkScroll();
 
 
 
@@ -421,9 +480,11 @@
                   userHandle: handle,
                   userName: author.displayName,
                   avatar: author.avatar,
+                  postorder: this.postorder,
                   postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
                   profileUrl: `https://bsky.app/profile/${handle}`,
                 };
+                this.postorder++
                 if (embed) {
                   if (embed.$type == "app.bsky.embed.images") {
                     newTweet.images = [];
@@ -476,7 +537,6 @@
                     ...newTweet,
                     likeCount,
                     timesUs,
-                    counter: this.counter,
                   };
                 }
               } catch (err) {
@@ -484,9 +544,9 @@
               }
 
             }
-            if (Date.now() % 10000 == 0 && !this.calculating) {
-              this.calculating = true
-              console.log("Date.now", Date.now() )
+
+            if (this.counter % 10000 == 0) {
+              console.log("this.counter", this.counter)
 
               // this.likeTracker = {};
               // for (const tpNoun of tweets.slice(0, 1000)) {
@@ -495,14 +555,14 @@
               // }
               let newCount = 0
               for (const uri in this.likeTracker) {
-                if ((!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount<5) || newCount > 1000
-                ) {
-                  delete this.likeTracker[uri]
-                } else {
+
+                if (this.likeTracker[uri]?.content) {
                   newCount++
+
+                } else if (this.likeTracker[uri].likeCount < 6) {
+                  delete this.likeTracker[uri]
                 }
               }
-              this.calculating = false
             }
           };
         },

@@ -452,7 +452,7 @@
 
 
             }
-            if (this.likeTracker[uri]?.likeCount == 10) {
+            if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == 10) {
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
 

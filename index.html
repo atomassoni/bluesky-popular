@@ -23,7 +23,7 @@
 
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center">
   <div x-data="tweetFeed" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
-    @scroll.window.throttle.250ms="checkScroll" class="min-h-screen">
+    @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" id="chart"></div>
 
     <!-- Heading -->
@@ -32,7 +32,7 @@
         Popular posts
       </h1>
       <!-- Vertical dot menu -->
-      <div class="relative" x-data="{ open: false }">
+      <div class="relative" x-data="{ open: false, selectedSort: 'default' }">
         <!-- Button to toggle menu -->
         <button @click="open = !open" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800 dark:text-gray-200" fill="none"
@@ -47,21 +47,34 @@
           x-cloak>
           <ul class="py-1">
             <li>
-              <p @click="sortHighToLow('likeCount')"
-                class="block px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <p @click="selectedSort = 'popularity'; sortHighToLow('likeCount')"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'popularity' }">
                 Sort By Popularity
+                <svg x-show="selectedSort === 'popularity'" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
               </p>
             </li>
             <li>
-              <p @click="sortLowToHigh('postorder')"
-                class="block px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <p @click="selectedSort = 'default'; sortLowToHigh('postorder')"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'default' }">
                 Sort By Default
+                <svg x-show="selectedSort === 'default'" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
               </p>
             </li>
           </ul>
         </div>
       </div>
     </div>
+
 
     <h1 x-cloak x-show="!tweets?.length"
       class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 animate-pulse">
@@ -134,7 +147,13 @@
                   </a>
                 </template>
               </div>
-
+              <!-- Video -->
+              <div class="mt-2" x-show="tweet.video">
+                <video :src="tweet.video" controls muted loop autoplay
+                  class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto">
+                  Your browser does not support the video tag.
+                </video>
+              </div>
               <!-- Embeds -->
               <template x-if="tweet.external">
                 <div class="mt-4">
@@ -202,8 +221,7 @@
         </template>
       </div>
     </div>
-    <p x-cloak x-show="loader"
-      class=" font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+    <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
       loading...
     </p>
   </div>
@@ -230,38 +248,65 @@
           this.startWebsocket();
           this.chartIt()
         },
+        //todo instead of the timeout wait til the actual videos are loaded?
+        async loadVisibleTweets() {
+          const newTweets = this.allPosts.slice(0, this.numToTrack);
+          for (let index = 0; index < this.tweets.length; index++) {
+            const post = newTweets[index];
+            const { link: uri, video, videoLink } = post
+            if (videoLink && !video && !this.likeTracker[uri].videoLoading) {
+              this.likeTracker[uri].videoLoading = true
+              console.log("loading video", videoLink);
+              const [_, __, repo, collection, rkey] = post.link.split("/");
+              try {
+                const videoBlob = await this.getMediaBlob(videoLink, repo);
+                const video = URL.createObjectURL(videoBlob)
+                this.likeTracker[uri].video = video;
+                this.likeTracker[uri].images = [];
+                this.likeTracker[uri].videoLoading = false;
+                console.log("loaded video", post)
+                const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
+                if (currentTweetIndex)
+                  newTweets[index] = this.likeTracker[uri]
+              } catch (err) {
+                console.error(err)
+              }
+            }
+          }
+          this.tweets = newTweets;
+
+        },
         markerClick(event, chartContext, opts, tweets) {
 
           const showOnly = this.allPosts[opts.seriesIndex];
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
+        //todo make these await?
         sortHighToLow(postField) {
           this.sortField = postField
           this.allPosts.sort((a, b) => b[postField] - a[postField]);
-          this.tweets = this.allPosts.slice(0, this.numToTrack);
+          this.loadVisibleTweets()
         },
         sortLowToHigh(postField) {
           this.sortField = postField
           this.allPosts.sort((a, b) => a[postField] - b[postField]);
-          this.tweets = this.allPosts.slice(0, this.numToTrack);
+          this.loadVisibleTweets()
         },
-        checkScroll() {
+        async checkScroll() {
           const scrollPosition = window.innerHeight + window.scrollY;
           const bottomPosition = document.documentElement.offsetHeight;
 
           if (scrollPosition >= bottomPosition - 100 && this.tweets.length >= this.numToTrack) {
             this.loader = true
-            setTimeout(() => {
-              this.loadMore();
-              this.loader = false;
-            }, 1000)
+            await this.loadMore();
+            this.loader = false;
           }
         },
         async loadMore() {
           console.log("load", this.numToTrack);
           this.numToTrack += 5;
-          this.tweets = this.allPosts.slice(0, this.numToTrack)
+          await this.loadVisibleTweets();
         },
 
         chartIt() {
@@ -307,7 +352,7 @@
             },
             xaxis: {
               type: 'datetime',
-      
+
             },
 
             legend: {
@@ -446,11 +491,7 @@
               // console.log({ tweets })
               const series = tweets.map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
-              this.chart.updateSeries(series)
-              this.checkScroll();
-
-
-
+              this.chart.updateSeries(series);
             }
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == 10) {
               const [_, __, repo, collection, rkey] = uri.split("/");
@@ -490,7 +531,7 @@
                     newTweet.images = [];
                     for (const img of embed.images) {
                       console.log("IMG", img);
-                      const blob = await this.getImageBlob(
+                      const blob = await this.getMediaBlob(
                         img.image.ref.$link,
                         repo
                       );
@@ -501,7 +542,7 @@
                     const { external } = embed;
                     const { title, description, uri } = external;
                     if (external.thumb) {
-                      const blob = await this.getImageBlob(
+                      const blob = await this.getMediaBlob(
                         external.thumb.ref.$link,
                         repo
                       );
@@ -519,6 +560,7 @@
                     }
                   } else if (embed.$type == "app.bsky.embed.video") {
                     console.log("video", { embed })
+                    newTweet.videoLink = embed.video.ref.$link;
                     newTweet.images = [
                       "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
                     ];
@@ -608,7 +650,7 @@
           const posts = await fetchFrom(url);
           return posts;
         },
-        async getImageBlob($link, did) {
+        async getMediaBlob($link, did) {
           const queryParams = new URLSearchParams({
             cid: $link,
             did,

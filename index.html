@@ -249,9 +249,26 @@
           this.chartIt()
         },
         //todo instead of the timeout wait til the actual videos are loaded?
+        async loadVideoInLikeTracker(uri) {
+          this.likeTracker[uri].videoLoading = false;
+
+          try {
+            const videoBlob = await this.getMediaBlob(videoLink, repo);
+            const video = URL.createObjectURL(videoBlob)
+            this.likeTracker[uri].video = video;
+            this.likeTracker[uri].images = [];
+            this.likeTracker[uri].videoLoading = false;
+            console.log("loaded video", this.likeTracker[uri])
+            // const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
+            // if (currentTweetIndex)
+            //   newTweets[index] = this.likeTracker[uri]
+          } catch (err) {
+            console.error(err)
+          }
+        },
         async loadVisibleTweets() {
           const newTweets = this.allPosts.slice(0, this.numToTrack);
-          for (let index = 0; index < this.tweets.length; index++) {
+          for (let index = 0; index < newTweets.length; index++) {
             const post = newTweets[index];
             const { link: uri, video, videoLink } = post
             if (videoLink && !video && !this.likeTracker[uri].videoLoading) {

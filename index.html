@@ -22,7 +22,7 @@
 </head>
 
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center">
-  <div x-data="tweetFeed" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
+  <div x-data="tweetFeed" id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
     @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" id="chart"></div>
 
@@ -85,7 +85,7 @@
       <!-- Tweets List -->
       <div>
         <template x-for="tweet in tweets" :key="tweet.id">
-          <!-- Summary Line -->
+          <!-- start of tweet div -->
 
           <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
             <!-- Parent Tweet -->
@@ -149,8 +149,8 @@
               </div>
               <!-- Video -->
               <div class="mt-2" x-show="tweet.video">
-                <video :src="tweet.video" controls muted loop autoplay
-                  class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto">
+                <video :src="tweet.video" controls loop muted
+                  class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
                   Your browser does not support the video tag.
                 </video>
               </div>
@@ -248,50 +248,52 @@
           this.startWebsocket();
           this.chartIt()
         },
-        //todo instead of the timeout wait til the actual videos are loaded?
+        intersectionObserver(elements) {
+          const observer = new IntersectionObserver((entries, _observer) => {
+            entries.forEach((entry) => {
+
+              if (entry.isIntersecting) {
+                entry.target.play();
+              } else {
+                entry.target.pause();
+              }
+            })
+          }, {
+            threshold: 1.0,
+
+          })
+          elements.forEach(el => observer.observe(el))
+        },
         async loadVideoInLikeTracker(uri) {
           this.likeTracker[uri].videoLoading = false;
-
-          try {
-            const videoBlob = await this.getMediaBlob(videoLink, repo);
-            const video = URL.createObjectURL(videoBlob)
-            this.likeTracker[uri].video = video;
-            this.likeTracker[uri].images = [];
-            this.likeTracker[uri].videoLoading = false;
-            console.log("loaded video", this.likeTracker[uri])
-            // const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
-            // if (currentTweetIndex)
-            //   newTweets[index] = this.likeTracker[uri]
-          } catch (err) {
-            console.error(err)
+          const post = this.likeTracker[uri];
+          const { video, videoLink } = post
+          if (videoLink && !video && !this.likeTracker[uri].videoLoading) {
+            console.log("loading video", videoLink);
+            const [_, __, repo, collection, rkey] = uri.split("/");
+            try {
+              const videoBlob = await this.getMediaBlob(videoLink, repo);
+              const video = URL.createObjectURL(videoBlob)
+              this.likeTracker[uri].video = video;
+              this.likeTracker[uri].images = [];
+              this.likeTracker[uri].videoLoading = false;
+              console.log("loaded video", this.likeTracker[uri])
+            } catch (err) {
+              console.error(err)
+            }
           }
         },
         async loadVisibleTweets() {
           const newTweets = this.allPosts.slice(0, this.numToTrack);
           for (let index = 0; index < newTweets.length; index++) {
-            const post = newTweets[index];
-            const { link: uri, video, videoLink } = post
-            if (videoLink && !video && !this.likeTracker[uri].videoLoading) {
-              this.likeTracker[uri].videoLoading = true
-              console.log("loading video", videoLink);
-              const [_, __, repo, collection, rkey] = post.link.split("/");
-              try {
-                const videoBlob = await this.getMediaBlob(videoLink, repo);
-                const video = URL.createObjectURL(videoBlob)
-                this.likeTracker[uri].video = video;
-                this.likeTracker[uri].images = [];
-                this.likeTracker[uri].videoLoading = false;
-                console.log("loaded video", post)
-                const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
-                if (currentTweetIndex)
-                  newTweets[index] = this.likeTracker[uri]
-              } catch (err) {
-                console.error(err)
-              }
-            }
+            const { link: uri } = newTweets[index];
+            await this.loadVideoInLikeTracker(uri)
+            const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
+            if (currentTweetIndex)
+              newTweets[index] = this.likeTracker[uri]
           }
           this.tweets = newTweets;
-
+          this.intersectionObserver(document.querySelectorAll('.f-video'))
         },
         markerClick(event, chartContext, opts, tweets) {
 
@@ -541,6 +543,7 @@
                   postorder: this.postorder,
                   postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
                   profileUrl: `https://bsky.app/profile/${handle}`,
+                  rkey
                 };
                 this.postorder++
                 if (embed) {

@@ -220,10 +220,12 @@
           </div>
         </template>
       </div>
+      
+      <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+        loading...
+      </p>
     </div>
-    <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
-      loading...
-    </p>
+   
   </div>
   <script>
     function tweetFeed() {
@@ -232,6 +234,7 @@
         allPosts: [],
         websocket: null,
         likeTracker: {},
+        labelTracker: {},
         counter: 0,
         postorder: 0,
         loader: false,
@@ -251,7 +254,6 @@
         intersectionObserver(elements) {
           const observer = new IntersectionObserver((entries, _observer) => {
             entries.forEach((entry) => {
-
               if (entry.isIntersecting) {
                 entry.target.play();
               } else {
@@ -260,7 +262,6 @@
             })
           }, {
             threshold: 1.0,
-
           })
           elements.forEach(el => observer.observe(el))
         },
@@ -522,7 +523,15 @@
                 console.log({ reply });
                 if (!record) return;
                 if (labels.length) {
-                  console.log({ labels })
+                  for(const {val} of labels) {
+                    ///this will count every like 
+                    if(!this.labelTracker[val]) {
+                      this.labelTracker[val] = 0;
+                    }
+                    this.labelTracker[val]++;
+                    
+                  }
+                  console.log("labels", Object.keys(this.labelTracker))
                   return;
                 }
                 const { embed } = record;

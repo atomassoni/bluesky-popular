@@ -236,6 +236,9 @@
       <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
         loading...
       </p>
+      <p x-cloak x-show="trackedLength != 0 && trackedLength == tweets?.length" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+        wait for more...
+      </p>
     </div>
 
   </div>
@@ -247,6 +250,7 @@
         websocket: null,
         likeTracker: {},
         labelTracker: {},
+        trackedLength: 0,
         counter: 0,
         postorder: 0,
         loader: false,
@@ -327,6 +331,7 @@
         },
         showOnlyNewPosts() {
           this.sortField = 'newOnly'
+          this.tweets = this.allPosts.sort((a, b) => b.postorder - a.postorder).filter(p => new Date(p.createdAt) > Date.now() - 10 * 60 * 1000)
         },
         async checkScroll() {
           const scrollPosition = window.innerHeight + window.scrollY;
@@ -401,6 +406,7 @@
         resetTweets() {
           this.showOnlyUri = undefined;
           if (this.sortField == 'newOnly') {
+
           } else {
             this.sortField == 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
           }
@@ -513,12 +519,13 @@
                     : null,
                 })).filter(p => this.sortField == 'newOnly' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
               // .sort((a, b) => b.likeCount - a.likeCount);
-              console.log({trackedProperNouns})
+              // console.log({ trackedProperNouns })
               console.log("count length", trackedProperNouns.length);
               let tweets = trackedProperNouns
                 .filter((r) => r.content)
                 .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }))
               this.allPosts = tweets;
+              this.trackedLength = tweets.length;
 
               if (!this.showOnlyUri) {
                 this.sortField === 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)

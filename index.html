@@ -454,6 +454,7 @@
               this.likeTracker[uri].likeCountHistory = []
             }
             // this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: this.likeTracker[uri].likeCount })
+            this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount/this.numSeconds;
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount/this.numSeconds).toFixed(1) })
 
             //             {
@@ -505,11 +506,9 @@
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
-              console.log("top 3", tweets.slice(0, 3))
               // console.log({ tweets })
-              const series = tweets.map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
+              const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
-              console.log("this.numSeconds", this.numSeconds)
               this.chart.updateSeries(series);
             }
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == 10) {

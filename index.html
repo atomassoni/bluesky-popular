@@ -70,6 +70,18 @@
                 </svg>
               </p>
             </li>
+            <li>
+              <p @click="selectedSort = 'newOnly'; showOnlyNewPosts()"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'newOnly' }">
+                Show only new posts
+                <svg x-show="selectedSort === 'newOnly'" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
           </ul>
         </div>
       </div>
@@ -220,12 +232,12 @@
           </div>
         </template>
       </div>
-      
+
       <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
         loading...
       </p>
     </div>
-   
+
   </div>
   <script>
     function tweetFeed() {
@@ -313,6 +325,9 @@
           this.allPosts.sort((a, b) => a[postField] - b[postField]);
           this.loadVisibleTweets()
         },
+        showOnlyNewPosts() {
+          this.sortField = 'newOnly'
+        },
         async checkScroll() {
           const scrollPosition = window.innerHeight + window.scrollY;
           const bottomPosition = document.documentElement.offsetHeight;
@@ -385,7 +400,10 @@
         showOnlyUri: undefined,
         resetTweets() {
           this.showOnlyUri = undefined;
-          this.sortField == 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
+          if (this.sortField == 'newOnly') {
+          } else {
+            this.sortField == 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
+          }
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -454,8 +472,8 @@
               this.likeTracker[uri].likeCountHistory = []
             }
             // this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: this.likeTracker[uri].likeCount })
-            this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount/this.numSeconds;
-            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount/this.numSeconds).toFixed(1) })
+            this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
+            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(1) })
 
             //             {
             //     "did": "did:plc:62ecdsoup3wpwwtjzb3vsfhe",
@@ -493,8 +511,9 @@
                       addSuffix: true,
                     })
                     : null,
-                }))
+                })).filter(p => this.sortField == 'newOnly' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
               // .sort((a, b) => b.likeCount - a.likeCount);
+              console.log({trackedProperNouns})
               console.log("count length", trackedProperNouns.length);
               let tweets = trackedProperNouns
                 .filter((r) => r.content)
@@ -506,7 +525,7 @@
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
-              // console.log({ tweets })
+              console.log({ tweets })
               const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
               this.chart.updateSeries(series);
@@ -521,13 +540,13 @@
                 console.log({ reply });
                 if (!record) return;
                 if (labels.length) {
-                  for(const {val} of labels) {
+                  for (const { val } of labels) {
                     ///this will count every like 
-                    if(!this.labelTracker[val]) {
+                    if (!this.labelTracker[val]) {
                       this.labelTracker[val] = 0;
                     }
                     this.labelTracker[val]++;
-                    
+
                   }
                   console.log("labels", Object.keys(this.labelTracker))
                   return;

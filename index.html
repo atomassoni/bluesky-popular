@@ -372,13 +372,10 @@
             },
             xaxis: {
               type: 'datetime',
-
             },
-
             legend: {
               show: false
             },
-
           };
 
           this.chart = new ApexCharts(document.querySelector("#chart"), options);
@@ -456,7 +453,8 @@
             if (!this.likeTracker[uri].likeCountHistory) {
               this.likeTracker[uri].likeCountHistory = []
             }
-            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: this.likeTracker[uri].likeCount })
+            // this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: this.likeTracker[uri].likeCount })
+            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount/this.numSeconds).toFixed(1) })
 
             //             {
             //     "did": "did:plc:62ecdsoup3wpwwtjzb3vsfhe",
@@ -511,6 +509,7 @@
               // console.log({ tweets })
               const series = tweets.map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
+              console.log("this.numSeconds", this.numSeconds)
               this.chart.updateSeries(series);
             }
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == 10) {

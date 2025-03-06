@@ -47,7 +47,7 @@
           x-cloak>
           <ul class="py-1">
             <li>
-              <p @click="toggleSortOrder(); sortPosts();"
+              <p @click="toggleSortOrder(); loadVisibleTweets();"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'popularity' }">
                 Sort By Popularity
@@ -60,7 +60,7 @@
             </li>
 
             <li>
-              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; filterPosts()"
+              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; loadVisibleTweets()"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': selectedFilter === 'new' }">
                 Show only new posts
@@ -274,13 +274,13 @@
           elements.forEach(el => observer.observe(el))
         },
         async loadVideoInLikeTracker(uri) {
-          this.likeTracker[uri].videoLoading = false;
           const post = this.likeTracker[uri];
-          const { video, videoLink } = post
-          if (videoLink && !video && !this.likeTracker[uri].videoLoading) {
+          const { video, videoLink, videoLoading } = post
+          if (videoLink && !video && !videoLoading) {
             console.log("loading video", videoLink);
             const [_, __, repo, collection, rkey] = uri.split("/");
             try {
+              this.likeTracker[uri].videoLoading = true;
               const videoBlob = await this.getMediaBlob(videoLink, repo);
               const video = URL.createObjectURL(videoBlob)
               this.likeTracker[uri].video = video;
@@ -293,7 +293,8 @@
           }
         },
         async loadVisibleTweets() {
-          const newTweets = this.allPosts.slice(0, this.numToTrack);
+          const newTweets = this.allPosts.sort(this.sortPosts).slice(0, this.numToTrack);
+          console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri } = newTweets[index];
             await this.loadVideoInLikeTracker(uri)
@@ -301,7 +302,7 @@
             if (currentTweetIndex)
               newTweets[index] = this.likeTracker[uri]
           }
-          this.tweets = newTweets;
+          this.tweets = newTweets
           this.intersectionObserver(document.querySelectorAll('.f-video'))
         },
         markerClick(event, chartContext, opts, tweets) {
@@ -310,18 +311,16 @@
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
-        //todo make these await?
-        sortPosts() {
-          this.sortField == 'postorder' ?
-            this.allPosts.sort((a, b) => a[this.sortField] - b[this.sortField]) :
-            //high to low
-            this.allPosts.sort((a, b) => b[this.sortField] - a[this.sortField]);
-          this.loadVisibleTweets()
-        },
-        filterPosts() {
-          const tweets = this.allPosts.slice()
-          this.tweets = tweets.filter(p => new Date(p.createdAt) > Date.now() - 10 * 60 * 1000)
-        },
+        sortPosts: (a, b) => this.sortField == 'postorder' ?
+          //low to high
+          (a, b) => a[this.sortField] - b[this.sortField] :
+          //high to low
+          (a, b) => b[this.sortField] - a[this.sortField],
+
+        filterPosts(tweets) {
+          return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
+        } 
+        ,
         toggleSortOrder() {
           this.selectedSort == 'default' ? this.selectedSort = 'popularity' : this.selectedSort = 'default';
           this.sortField = this.selectedSort == 'popularity' ? 'likesPerSecond' : 'postorder';
@@ -398,7 +397,7 @@
         showOnlyUri: undefined,
         resetTweets() {
           this.showOnlyUri = undefined;
-          this.sortPosts();
+          this.loadVisibleTweets();
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -506,22 +505,23 @@
                       addSuffix: true,
                     })
                     : null,
-                })).filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
+                }));
+
               // .sort((a, b) => b.likeCount - a.likeCount);
               // console.log({ trackedProperNouns })
               console.log("count length", trackedProperNouns.length);
               let tweets = trackedProperNouns
                 .filter((r) => r.content)
                 .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }))
-              this.allPosts = tweets;
+              this.allPosts = this.filterPosts(tweets);
               this.trackedLength = tweets.length;
 
               if (!this.showOnlyUri) {
-                this.sortPosts()
+                this.loadVisibleTweets();
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
-              console.log({ tweets })
+
               const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               console.log({ series })
               this.chart.updateSeries(series);

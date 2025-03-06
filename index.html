@@ -47,7 +47,7 @@
           x-cloak>
           <ul class="py-1">
             <li>
-              <p @click="selectedSort = 'popularity'; sortHighToLow('likeCount')"
+              <p @click="toggleSortOrder(); sortPosts();"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'popularity' }">
                 Sort By Popularity
@@ -58,24 +58,13 @@
                 </svg>
               </p>
             </li>
+
             <li>
-              <p @click="selectedSort = 'default'; sortLowToHigh('postorder')"
+              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; filterPosts()"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'default' }">
-                Sort By Default
-                <svg x-show="selectedSort === 'default'" xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </p>
-            </li>
-            <li>
-              <p @click="selectedSort = 'newOnly'; showOnlyNewPosts()"
-                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'newOnly' }">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedFilter === 'new' }">
                 Show only new posts
-                <svg x-show="selectedSort === 'newOnly'" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="selectedFilter === 'new'" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -236,7 +225,8 @@
       <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
         loading...
       </p>
-      <p x-cloak x-show="trackedLength != 0 && trackedLength == tweets?.length" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+      <p x-cloak x-show="trackedLength != 0 && trackedLength == tweets?.length"
+        class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
         wait for more...
       </p>
     </div>
@@ -261,6 +251,8 @@
         numToTrack: 25,
         calculating: false,
         sortField: 'postorder',
+        selectedFilter: null,
+        selectedSort: 'default',
         collections: {},
         async init() {
           this.addVisibilityListeners();
@@ -319,19 +311,20 @@
           this.showOnlyUri = showOnly.link
         },
         //todo make these await?
-        sortHighToLow(postField) {
-          this.sortField = postField
-          this.allPosts.sort((a, b) => b[postField] - a[postField]);
+        sortPosts() {
+          this.sortField == 'postorder' ?
+            this.allPosts.sort((a, b) => a[this.sortField] - b[this.sortField]) :
+            //high to low
+            this.allPosts.sort((a, b) => b[this.sortField] - a[this.sortField]);
           this.loadVisibleTweets()
         },
-        sortLowToHigh(postField) {
-          this.sortField = postField
-          this.allPosts.sort((a, b) => a[postField] - b[postField]);
-          this.loadVisibleTweets()
+        filterPosts() {
+          const tweets = this.allPosts.slice()
+          this.tweets = tweets.filter(p => new Date(p.createdAt) > Date.now() - 10 * 60 * 1000)
         },
-        showOnlyNewPosts() {
-          this.sortField = 'newOnly'
-          this.tweets = this.allPosts.sort((a, b) => b.postorder - a.postorder).filter(p => new Date(p.createdAt) > Date.now() - 10 * 60 * 1000)
+        toggleSortOrder() {
+          this.selectedSort == 'default' ? this.selectedSort = 'popularity' : this.selectedSort = 'default';
+          this.sortField = this.selectedSort == 'popularity' ? 'likesPerSecond' : 'postorder';
         },
         async checkScroll() {
           const scrollPosition = window.innerHeight + window.scrollY;
@@ -405,11 +398,7 @@
         showOnlyUri: undefined,
         resetTweets() {
           this.showOnlyUri = undefined;
-          if (this.sortField == 'newOnly') {
-
-          } else {
-            this.sortField == 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
-          }
+          this.sortPosts();
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -517,7 +506,7 @@
                       addSuffix: true,
                     })
                     : null,
-                })).filter(p => this.sortField == 'newOnly' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
+                })).filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
               // .sort((a, b) => b.likeCount - a.likeCount);
               // console.log({ trackedProperNouns })
               console.log("count length", trackedProperNouns.length);
@@ -528,7 +517,7 @@
               this.trackedLength = tweets.length;
 
               if (!this.showOnlyUri) {
-                this.sortField === 'postorder' ? this.sortLowToHigh(this.sortField) : this.sortHighToLow(this.sortField)
+                this.sortPosts()
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }

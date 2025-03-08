@@ -292,8 +292,8 @@
             }
           }
         },
-        async loadVisibleTweets() {
-          const newTweets = this.allPosts.sort(this.sortPosts).slice(0, this.numToTrack);
+        async loadVisibleTweets(sortField) {
+          const newTweets = this.allPosts.sort((a,b)=>sortPosts(a,b,sortField)).slice(0, this.numToTrack);
           console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri } = newTweets[index];
@@ -311,15 +311,11 @@
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
-        sortPosts: (a, b) => this.sortField == 'postorder' ?
-          //low to high
-          (a, b) => a[this.sortField] - b[this.sortField] :
-          //high to low
-          (a, b) => b[this.sortField] - a[this.sortField],
+       
 
         filterPosts(tweets) {
           return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
-        } 
+        }
         ,
         toggleSortOrder() {
           this.selectedSort == 'default' ? this.selectedSort = 'popularity' : this.selectedSort = 'default';
@@ -338,7 +334,7 @@
         async loadMore() {
           console.log("load", this.numToTrack);
           this.numToTrack += 5;
-          await this.loadVisibleTweets();
+          await this.loadVisibleTweets(this.sortField);
         },
 
         chartIt() {
@@ -397,7 +393,7 @@
         showOnlyUri: undefined,
         resetTweets() {
           this.showOnlyUri = undefined;
-          this.loadVisibleTweets();
+          this.loadVisibleTweets(this.sortField);
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -517,7 +513,7 @@
               this.trackedLength = tweets.length;
 
               if (!this.showOnlyUri) {
-                this.loadVisibleTweets();
+                this.loadVisibleTweets(this.sortField);
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
@@ -567,7 +563,7 @@
                   profileUrl: `https://bsky.app/profile/${handle}`,
                   rkey
                 };
-                this.postorder++
+                this.postorder++;
                 if (embed) {
                   if (embed.$type == "app.bsky.embed.images") {
                     newTweet.images = [];
@@ -673,7 +669,6 @@
         },
         async getProfile(actorIdentifier) {
           const endpoint = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile`;
-          // Construct the URL with the required query parameter
           const url = `${endpoint}?actor=${encodeURIComponent(
             actorIdentifier
           )}`;
@@ -729,6 +724,11 @@
         throw error;
       }
     }
+    function sortPosts (a, b, sortField)  {
+          return sortField === 'postorder'
+            ? a[sortField] - b[sortField]
+            : b[sortField] - a[sortField];
+        }
   </script>
 </body>
 

@@ -8,6 +8,28 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script type="module">
+    // Import Dexie
+    import { Dexie } from 'https://unpkg.com/dexie/dist/modern/dexie.mjs';
+
+    const db = new Dexie('BlueskyDatabase');
+    db.version(1).stores({
+      authors: '++id, handle, refreshTime',
+      posts: "++id, cid, refreshTime",
+      videos: "++id, cid, refreshTime",
+      images: "++id, cid, refreshTime",
+    });
+    try {
+      const deletionTables = ['authors', 'posts', 'videos', 'images']
+      const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
+      console.log({ oldData })
+      await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))))
+    } catch (err) {
+      console.error(err)
+    }
+    window.db = db
+
+  </script>
 
   <script type="module">
     import { formatDistanceToNowStrict } from "https://esm.sh/date-fns/formatDistanceToNowStrict.mjs";
@@ -60,7 +82,7 @@
             </li>
 
             <li>
-              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; loadVisibleTweets()"
+              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; filterPosts(allPosts); loadVisibleTweets(sortField)"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': selectedFilter === 'new' }">
                 Show only new posts
@@ -225,7 +247,7 @@
       <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
         loading...
       </p>
-      <p x-cloak x-show="trackedLength != 0 && trackedLength == tweets?.length"
+      <p x-cloak x-show="trackedLength != 0 && trackedLength <= tweets?.length"
         class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
         wait for more...
       </p>
@@ -281,7 +303,16 @@
             const [_, __, repo, collection, rkey] = uri.split("/");
             try {
               this.likeTracker[uri].videoLoading = true;
-              const videoBlob = await this.getMediaBlob(videoLink, repo);
+              let dbRes = await db.videos.get({ cid: videoLink })
+              let videoBlob = dbRes?.blob
+              if (!videoBlob) {
+                videoBlob = await this.getMediaBlob(videoLink, repo);
+                console.log("video downloading")
+                db.videos.add({ cid: videoLink, blob: videoBlob, refreshTime: Date.now() })
+              } else {
+                console.log("successful blob save")
+              }
+              // const videoBlob = await this.getMediaBlob(videoLink, repo);
               const video = URL.createObjectURL(videoBlob)
               this.likeTracker[uri].video = video;
               this.likeTracker[uri].images = [];
@@ -293,7 +324,7 @@
           }
         },
         async loadVisibleTweets(sortField) {
-          const newTweets = this.allPosts.sort((a,b)=>sortPosts(a,b,sortField)).slice(0, this.numToTrack);
+          const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
           console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri } = newTweets[index];
@@ -311,7 +342,7 @@
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
-       
+
 
         filterPosts(tweets) {
           return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
@@ -431,8 +462,7 @@
             if (!commit) return;
 
             const { operation, cid, record, rkey, collection } = commit || {};
-            // this.collections[collection] = true
-            // console.log("collections", Object.keys(this.collections))
+
 
             if (operation != "create") {
               return;
@@ -498,7 +528,7 @@
                   ...record,
                   timestamp: record.createdAt
                     ? format(new Date(record.createdAt), {
-                      addSuffix: true,
+                      // addSuffix: true,
                     })
                     : null,
                 }));
@@ -526,10 +556,27 @@
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
 
-                const reply = (await this.getPosts(uri))?.posts[0]
-                const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = reply || {}
+                let postSave = await db.posts.get({ cid: likeCid })
+
+                console.log("database post", postSave)
+                if (!postSave) {
+                  postSave = (await this.getPosts(uri))?.posts[0];
+                  console.log({ postSave }, likeCid, postSave.cid)
+                  db.posts.add({ ...postSave, refreshTime: Date.now() })
+                }
+                const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+
+
                 const { handle, avatar, displayName } = author || {};
-                console.log({ reply });
+                const authorSave = await db.authors.get({ handle })
+                console.log({ authorSave })
+                //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
+                if (!authorSave) { //refresh time over 24 hours ago
+                  const authorProfile = await this.getProfile(repo);
+                  console.log({ authorProfile })
+                  db.authors.add({ ...authorProfile, refreshTime: Date.now() })
+                }
+
                 if (!record) return;
                 if (labels.length) {
                   for (const { val } of labels) {
@@ -547,7 +594,7 @@
                 const newTweet = {
                   id: likeCid,
                   timestamp: format(new Date(record.createdAt), {
-                    addSuffix: true,
+                    // addSuffix: true,
                   }),
                   totalLikeCount,
                   replyCount,
@@ -564,8 +611,9 @@
                   rkey
                 };
                 this.postorder++;
+
                 if (embed) {
-                  if (embed.$type == "app.bsky.embed.images") {
+                  if (embed.$type?.includes("embed.images")) {
                     newTweet.images = [];
                     for (const img of embed.images) {
                       console.log("IMG", img);
@@ -575,7 +623,7 @@
                       );
                       newTweet.images.push(URL.createObjectURL(blob));
                     }
-                  } else if (embed.$type === "app.bsky.embed.external") {
+                  } else if (embed.$type?.includes("embed.external")) {
                     newTweet.external = {}; // embed;
                     const { external } = embed;
                     const { title, description, uri } = external;
@@ -596,13 +644,13 @@
                       newTweet.external.uri = uri;
                       newTweet.external.hostname = new URL(uri).hostname;
                     }
-                  } else if (embed.$type == "app.bsky.embed.video") {
+                  } else if (embed.$type?.includes("embed.video")) {
                     console.log("video", { embed })
                     newTweet.videoLink = embed.video.ref.$link;
                     newTweet.images = [
                       "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
                     ];
-                  } else if (embed.$type == "app.bsky.embed.record") {
+                  } else if (embed.$type?.includes("embed.record")) {
                     const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
                     console.log({ quotedPost })
                     newTweet.quotePost = quotedPost
@@ -724,11 +772,11 @@
         throw error;
       }
     }
-    function sortPosts (a, b, sortField)  {
-          return sortField === 'postorder'
-            ? a[sortField] - b[sortField]
-            : b[sortField] - a[sortField];
-        }
+    function sortPosts(a, b, sortField) {
+      return sortField === 'postorder'
+        ? a[sortField] - b[sortField]
+        : b[sortField] - a[sortField];
+    }
   </script>
 </body>
 

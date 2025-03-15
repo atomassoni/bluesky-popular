@@ -558,7 +558,7 @@
                 }));
 
               // .sort((a, b) => b.likeCount - a.likeCount);
-              console.log({ trackedProperNouns })
+              // console.log({ trackedProperNouns })
 
               console.log("count length", trackedProperNouns.length);
               let tweets = trackedProperNouns
@@ -597,7 +597,7 @@
               try {
 
                 let postSave = await db.posts.get({ cid: likeCid })
-                if (postSave?.viewCount > 0) {
+                if (postSave?.embed?.$type?.includes("video") ? postSave.viewCount > 1 : postSave.viewCount > 0) {
                   console.log("already seen this", postSave)
                   return;
                 }

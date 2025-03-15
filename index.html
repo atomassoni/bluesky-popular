@@ -95,6 +95,12 @@
                 </svg>
               </p>
             </li>
+            <li>
+              <p @click="resetPostCache(); open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Clear post view history
+              </p>
+            </li>
           </ul>
         </div>
       </div>
@@ -324,16 +330,7 @@
             const [_, __, repo, collection, rkey] = uri.split("/");
             try {
               this.likeTracker[uri].videoLoading = true;
-              let dbRes = await db.videos.get({ cid: videoLink })
-              let videoBlob = dbRes?.blob
-              if (!videoBlob) {
-                videoBlob = await this.getMediaBlob(videoLink, repo);
-                console.log("video downloading")
-                db.videos.add({ cid: videoLink, blob: videoBlob, refreshTime: Date.now() })
-              } else {
-                console.log("successful blob save")
-              }
-              // const videoBlob = await this.getMediaBlob(videoLink, repo);
+              const videoBlob = await this.loadBlob('videos', videoLink, repo)
               const video = URL.createObjectURL(videoBlob)
               this.likeTracker[uri].video = video;
               this.likeTracker[uri].images = [];
@@ -342,6 +339,22 @@
             } catch (err) {
               console.error(err)
             }
+          }
+        },
+        async loadBlob(databaseName, cid, repo) {
+          try {
+            let dbRes = await db[databaseName].get({ cid })
+            let mediaBlob = dbRes?.blob
+            if (!mediaBlob) {
+              mediaBlob = await this.getMediaBlob(cid, repo);
+              console.log("media downloading")
+              db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
+            } else {
+              console.log("media blob exists", cid)
+            }
+            return mediaBlob
+          } catch (err) {
+            console.error(err)
           }
         },
         async loadVisibleTweets(sortField) {
@@ -364,8 +377,10 @@
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
-
-
+        resetPostCache() {
+          const col = db.posts.toCollection().modify(post=>post.viewCount = 0)
+          
+        },
         filterPosts(tweets) {
           return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
         }
@@ -595,7 +610,7 @@
               try {
 
                 let postSave = await db.posts.get({ cid: likeCid })
-                if (postSave?.embed?.$type?.includes("video") ? postSave.viewCount > 1 : postSave?.viewCount > 0) {
+                if (postSave?.videoLink ? postSave?.viewCount > 1 : postSave?.viewCount > 0) {
                   console.log("already seen this", postSave)
                   return;
                 }
@@ -656,7 +671,8 @@
                     newTweet.images = [];
                     for (const img of embed.images) {
                       console.log("IMG", img);
-                      const blob = await this.getMediaBlob(
+                      const blob = await this.loadBlob(
+                        'images',
                         img.image.ref.$link,
                         repo
                       );
@@ -667,7 +683,8 @@
                     const { external } = embed;
                     const { title, description, uri } = external;
                     if (external.thumb) {
-                      const blob = await this.getMediaBlob(
+                      const blob = await this.loadBlob(
+                        'images',
                         external.thumb.ref.$link,
                         repo
                       );

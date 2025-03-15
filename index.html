@@ -18,12 +18,14 @@
       posts: "++id, cid, refreshTime",
       videos: "++id, cid, refreshTime",
       images: "++id, cid, refreshTime",
+      trackedLikes: "link",
     });
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
       console.log({ oldData })
       await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))))
+      await db.trackedLikes.clear()
     } catch (err) {
       console.error(err)
     }
@@ -69,7 +71,7 @@
           x-cloak>
           <ul class="py-1">
             <li>
-              <p @click="toggleSortOrder(); loadVisibleTweets();"
+              <p @click="toggleSortOrder(); loadVisibleTweets(sortField);"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'popularity' }">
                 Sort By Popularity
@@ -82,7 +84,7 @@
             </li>
 
             <li>
-              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; filterPosts(allPosts); loadVisibleTweets(sortField)"
+              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; tweets = filterPosts(allPosts); loadVisibleTweets()"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': selectedFilter === 'new' }">
                 Show only new posts
@@ -110,7 +112,7 @@
         <template x-for="tweet in tweets" :key="tweet.id">
           <!-- start of tweet div -->
 
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 post">
             <!-- Parent Tweet -->
             <template x-if="tweet.parent">
               <div
@@ -260,6 +262,7 @@
         tweets: [],
         allPosts: [],
         websocket: null,
+        observer: null,
         likeTracker: {},
         labelTracker: {},
         trackedLength: 0,
@@ -280,8 +283,9 @@
           this.addVisibilityListeners();
           this.startWebsocket();
           this.chartIt()
+
         },
-        intersectionObserver(elements) {
+        videoIntersectionObserver(elements) {
           const observer = new IntersectionObserver((entries, _observer) => {
             entries.forEach((entry) => {
               if (entry.isIntersecting) {
@@ -294,6 +298,25 @@
             threshold: 1.0,
           })
           elements.forEach(el => observer.observe(el))
+        },
+        postIntersectionObserver(elements) {
+          elements.forEach(el => this.observer?.unobserve(el))
+          this.observer = new IntersectionObserver((entries, _observer) => {
+            entries.forEach(async (entry) => {
+              if (entry.isIntersecting) {
+                const { id } = entry.target._x_dataStack[0].tweet
+                const post = await db.posts.get({ cid: id })
+                const views = post.viewCount ? post.viewCount + 1 : 1
+                db.posts.put({ ...post, viewCount: views })
+              } else {
+                // entry.target.pause();
+              }
+            })
+          }, {
+            threshold: 1.0,
+          })
+          console.log({ elements })
+          elements.forEach(el => this.observer.observe(el))
         },
         async loadVideoInLikeTracker(uri) {
           const post = this.likeTracker[uri];
@@ -334,7 +357,8 @@
               newTweets[index] = this.likeTracker[uri]
           }
           this.tweets = newTweets
-          this.intersectionObserver(document.querySelectorAll('.f-video'))
+          this.postIntersectionObserver(document.querySelectorAll('.post'))
+          this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
         },
         markerClick(event, chartContext, opts, tweets) {
 
@@ -534,11 +558,27 @@
                 }));
 
               // .sort((a, b) => b.likeCount - a.likeCount);
-              // console.log({ trackedProperNouns })
+              console.log({ trackedProperNouns })
+
               console.log("count length", trackedProperNouns.length);
               let tweets = trackedProperNouns
                 .filter((r) => r.content)
-                .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }))
+                .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
+
+              const dbput = tweets.map(t => ({ likeCount: t.likeCount, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
+              db.trackedLikes.bulkPut(dbput).then(() => {
+                console.log("Done adding 100,000 raindrops all over the place");
+              }).catch(error => {
+                if (error.name === "BulkError") {
+                  // Explicitly catching the bulkAdd() operation makes those successful
+                  // additions commit despite that there were errors.
+                  console.error("Some raindrops did not succeed. However, " +
+                    100000 - e.failures.length + " raindrops was added successfully");
+                } else {
+                  console.error(error)
+                  throw error; // we're only handling BulkError specifically here...
+                }
+              });
               this.allPosts = this.filterPosts(tweets);
               this.trackedLength = tweets.length;
 
@@ -557,15 +597,16 @@
               try {
 
                 let postSave = await db.posts.get({ cid: likeCid })
-
-                console.log("database post", postSave)
+                if (postSave?.viewCount > 0) {
+                  console.log("already seen this", postSave)
+                  return;
+                }
                 if (!postSave) {
                   postSave = (await this.getPosts(uri))?.posts[0];
                   console.log({ postSave }, likeCid, postSave.cid)
                   db.posts.add({ ...postSave, refreshTime: Date.now() })
                 }
                 const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
-
 
                 const { handle, avatar, displayName } = author || {};
                 const authorSave = await db.authors.get({ handle })

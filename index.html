@@ -306,14 +306,12 @@
               if (entry.isIntersecting) {
                 const { id } = entry.target._x_dataStack[0].tweet
                 const post = await db.posts.get({ cid: id })
-                const views = post.viewCount ? post.viewCount + 1 : 1
+                const views = post?.viewCount ? post.viewCount + 1 : 1
                 db.posts.put({ ...post, viewCount: views })
-              } else {
-                // entry.target.pause();
               }
             })
           }, {
-            threshold: 1.0,
+            threshold: 0.6,
           })
           console.log({ elements })
           elements.forEach(el => this.observer.observe(el))
@@ -597,7 +595,7 @@
               try {
 
                 let postSave = await db.posts.get({ cid: likeCid })
-                if (postSave?.embed?.$type?.includes("video") ? postSave.viewCount > 1 : postSave.viewCount > 0) {
+                if (postSave?.embed?.$type?.includes("video") ? postSave.viewCount > 1 : postSave?.viewCount > 0) {
                   console.log("already seen this", postSave)
                   return;
                 }

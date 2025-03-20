@@ -483,8 +483,9 @@
           if (this.websocket) {
             this.websocket.close();
           }
+          const allJetstreams = ["jetstream1.us-east.bsky.network", "jetstream2.us-east.bsky.network", "jetstream1.us-west.bsky.network", "jetstream2.us-west.bsky.network"]
           this.websocket = new WebSocket(
-            `wss://jetstream2.us-east.bsky.network/subscribe\?wantedCollections=${wantedCollections}`
+            `wss://${allJetstreams[Math.floor(Math.random() * 4)]}/subscribe\?wantedCollections=${wantedCollections}`
           );
 
           this.websocket.onopen = () => {

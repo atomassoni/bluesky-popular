@@ -45,7 +45,7 @@
   <!-- <script type="module" src="./dist/bundle.js"></script> -->
 </head>
 
-<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center">
+<body class="bg-white dark:bg-gray-900 min-h-screen flex items-center justify-center">
   <div x-data="tweetFeed" id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
     @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" x-show="showChart" id="chart"></div>

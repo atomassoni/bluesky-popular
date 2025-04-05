@@ -105,8 +105,20 @@
               <p @click="showChart = !showChart; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': showChart }">
-                Show Likes Graph
+                Show likes graph
                 <svg x-show="showChart" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
+            <li>
+              <p @click="showAllLanguages = !showAllLanguages; open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': showAllLanguages}">
+                Show all languages
+                <svg x-show="showAllLanguages" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -298,6 +310,8 @@
         selectedSort: 'default',
         collections: {},
         showChart: false,
+        showAllLanguages: false,
+
         async init() {
           this.addVisibilityListeners();
           this.startWebsocket();
@@ -394,7 +408,7 @@
           const col = db.posts.toCollection().modify(post => post.viewCount = 0)
         },
         filterPosts(tweets) {
-          return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p)
+          return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p).filter(p => this.showAllLanguages ? p : p.langs?.includes('en'))
         }
         ,
         toggleSortOrder() {
@@ -657,7 +671,7 @@
                   console.log("labels", Object.keys(this.labelTracker))
                   return;
                 }
-                const { embed } = record;
+                const { embed, langs } = record;
                 const newTweet = {
                   id: likeCid,
                   timestamp: format(new Date(record.createdAt), {
@@ -675,7 +689,8 @@
                   postorder: this.postorder,
                   postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
                   profileUrl: `https://bsky.app/profile/${handle}`,
-                  rkey
+                  rkey,
+                  langs
                 };
                 this.postorder++;
 

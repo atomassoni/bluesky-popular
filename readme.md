@@ -1,5 +1,5 @@
 # Bluesky popular posts
 
-Load the webpage [here](https://atomassoni.github.io/bluesky-popular)
+Challenge: use just an html page and javascript to make an interesting BlueSky feed.
 
-Should load the posts being liked right now. Refresh the page to reset the like counts. 
+Link [here](https://atomassoni.github.io/bluesky-popular)

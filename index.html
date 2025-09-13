@@ -18,10 +18,11 @@
       posts: "++id, cid, refreshTime",
       videos: "++id, cid, refreshTime",
       images: "++id, cid, refreshTime",
+      trending: "++id, text, refreshTime",
       trackedLikes: "link",
     });
     try {
-      const deletionTables = ['authors', 'posts', 'videos', 'images']
+      const deletionTables = ['authors', 'posts', 'videos', 'images', 'trending']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
       console.log({ oldData })
       await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))))
@@ -42,6 +43,18 @@
       display: none !important;
     }
   </style>
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.6.3';
+    const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    window.extractor = extractor;
+    const all = await db.trending.toArray();
+    // Convert back to Float32Array for cosine math:
+    const trending = all.map(h => ({
+      text: h.text,
+      emb: new Float32Array(h.embedding)
+    }));
+    window.trending = trending
+  </script>
   <!-- <script type="module" src="./dist/bundle.js"></script> -->
 </head>
 
@@ -49,6 +62,11 @@
   <div x-data="tweetFeed" id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
     @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" x-show="showChart" id="chart"></div>
+    <div x-show="showTrending" id="trending">
+
+      <input type="text" x-model="trendingItem" @keydown.enter="addTrending()" class="flex-1 outline-none p-1"
+        placeholder="enter a headline" />
+    </div>
 
     <!-- Heading -->
     <div x-cloak x-show="tweets?.length" class="flex items-center justify-between">
@@ -119,6 +137,18 @@
                 :class="{ 'bg-gray-100 dark:bg-gray-700': showAllLanguages}">
                 Show all languages
                 <svg x-show="showAllLanguages" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
+            <li>
+              <p @click="showTrending = !showTrending; open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': showTrending }">
+                Show trending
+                <svg x-show="showTrending" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -310,8 +340,10 @@
         selectedSort: 'default',
         collections: {},
         showChart: false,
+        showTrending: false,
         showAllLanguages: false,
-
+        trends: [],
+        trendingItem: '',
         async init() {
           this.addVisibilityListeners();
           this.startWebsocket();
@@ -348,6 +380,14 @@
           })
           console.log({ elements })
           elements.forEach(el => this.observer.observe(el))
+        },
+        async addTrending() {
+          if (!this.trendingItem) return
+          const tensor = await extractor([this.trendingItem], { pooling: 'mean', normalize: true });
+          const embArray = Array.from(tensor.data);         // convert Float32Array → plain JS array
+          await db.trending.add({ text: this.trendingItem, embedding: embArray, refreshTime: Date.now() });
+          window.trending.push({ emb: embArray, text: this.trendingItem })
+          this.trendingItem = ''
         },
         async loadVideoInLikeTracker(uri) {
           const post = this.likeTracker[uri];
@@ -697,6 +737,7 @@
                 if (embed) {
                   if (embed.$type?.includes("embed.images")) {
                     newTweet.images = [];
+                    newTweet.imageMetadata = embed.images
                     for (const img of embed.images) {
                       console.log("IMG", img);
                       const blob = await this.loadBlob(
@@ -751,6 +792,8 @@
                     timesUs,
                   };
                 }
+                console.log({newTweet})
+                await checkPostAgainstHeadings(`${newTweet.content} ${newTweet.quotePost? 'in reply to: ' + newTweet.quotePost?.record?.text: ""} ${newTweet.external? ' -- ' + JSON.stringify(newTweet.external): ""}${newTweet.imageMetadata?.map(im=>im.alt).some(desc=>desc)?newTweet.imageMetadata?.map(im=>im.alt):""}`,)
               } catch (err) {
                 console.error(err);
               }
@@ -830,6 +873,7 @@
         }
       };
     }
+
     async function fetchFrom(url, type = "application/json") {
       try {
         const response = await fetch(url, {
@@ -860,6 +904,30 @@
       return sortField === 'postorder'
         ? a[sortField] - b[sortField]
         : b[sortField] - a[sortField];
+    }
+    async function checkPostAgainstHeadings(post, threshold = 0.5) {
+      const pt = await extractor([post], { pooling: 'mean', normalize: true });
+      const pEmb = pt.data;
+
+      const scores = trending.map(h => ({
+        text: h.text,
+        score: cosineSimilarity(pEmb, h.emb)
+      }));
+
+      console.log({post}, "Scores", scores)
+      // find matches
+      return scores.filter(item => item.score >= threshold);
+    }
+
+    // helper cosine:
+    function cosineSimilarity(a, b) {
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+      }
+      return dot / (Math.sqrt(na) * Math.sqrt(nb));
     }
   </script>
 </body>

@@ -15,6 +15,7 @@
     const db = new Dexie('BlueskyDatabase');
     db.version(1).stores({
       authors: '++id, handle, refreshTime',
+      verifiers: '++id, did, refreshTime',
       posts: "++id, cid, refreshTime",
       videos: "++id, cid, refreshTime",
       images: "++id, cid, refreshTime",
@@ -245,15 +246,15 @@
                         <li><span class="font-medium">Status:</span> <span
                             x-text="tweet.author.verification?.verifiedStatus || 'none'"></span></li>
                         <li><span class="font-medium">Trusted Verifier:</span> <span
-                            x-text="tweet.author.verification?.trustedVerifierStatus || 'none'"></span></li>
+                            x-text="tweet.author.verification?.trustedVerifierStatus || 'no'"></span></li>
                         <template x-if="(tweet.author.verification?.verifications || []).length">
                           <li class="mt-1">
-                            <span class="font-medium">Assertions:</span>
+                            <span class="font-medium">Verifiers:</span>
                             <ul class="mt-1 list-disc list-inside space-y-0.5">
-                              <template x-for="v in tweet.author.verification.verifications" :key="v.uri">
+                              <template x-for="v in tweet.verifiers" :key="v.did">
                                 <li>
                                   <span
-                                    x-text="(v.isValid ? 'valid' : 'invalid') + ' · ' + (v.issuer || 'unknown')"></span>
+                                    x-text="v.handle || 'unknown'"></span>
                                 </li>
                               </template>
                             </ul>
@@ -828,7 +829,7 @@
               }
 
               const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
-              console.log({ series })
+              // console.log({ series })
               this.chart.updateSeries(series);
             }
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == 10) {
@@ -858,6 +859,18 @@
                   console.log({ authorProfile })
                   db.authors.add({ ...authorProfile, refreshTime: Date.now() })
                   authorSave = { ...authorProfile, refreshTime: Date.now() }
+                }
+
+                let verifiersSave = []
+                for (const verification of authorSave.verification?.verifications || []) {
+                  const { issuer } = verification
+                  const verifier = await db.verifiers.get({ did: issuer });
+                  if (verifier) {
+                    verifiersSave.push(verifier);
+                  } else {
+                    const newVerifier = await this.getProfile(issuer);
+                    verifiersSave.push(newVerifier);
+                  }
                 }
 
                 if (!record) return;
@@ -893,7 +906,8 @@
                   profileUrl: `https://bsky.app/profile/${handle}`,
                   rkey,
                   langs,
-                  author: authorSave
+                  author: authorSave,
+                  verifiers: verifiersSave
                 };
                 this.postorder++;
 

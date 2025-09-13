@@ -253,8 +253,7 @@
                             <ul class="mt-1 list-disc list-inside space-y-0.5">
                               <template x-for="v in tweet.verifiers" :key="v.did">
                                 <li>
-                                  <span
-                                    x-text="v.handle || 'unknown'"></span>
+                                  <span x-text="v.handle || 'unknown'"></span>
                                 </li>
                               </template>
                             </ul>
@@ -869,6 +868,7 @@
                     verifiersSave.push(verifier);
                   } else {
                     const newVerifier = await this.getProfile(issuer);
+                    db.verifiers.add({ ...newVerifier, refreshTime: Date.now() })
                     verifiersSave.push(newVerifier);
                   }
                 }

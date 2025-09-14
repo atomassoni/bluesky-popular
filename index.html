@@ -138,6 +138,18 @@
                 </svg>
               </p>
             </li>
+            <li>
+              <p @click="noBigAccounts = !noBigAccounts; postThreshold = noBigAccounts? 5 : 10; open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': noBigAccounts}">
+                Ignore large accounts
+                <svg x-show="noBigAccounts" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
           </ul>
         </div>
       </div>
@@ -163,47 +175,58 @@
                 <article x-show="showOnlyAuthorProfile && tweet.author" x-cloak
                   class="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:bg-neutral-900 dark:border-neutral-800">
                   <!-- Header -->
-                  <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <img :src="tweet.author.avatar || fallbackAvatar" alt=""
-                      class="h-16 w-16 rounded-full object-cover ring-2 ring-gray-100 dark:ring-neutral-800"
-                      @error="$event.target.src = fallbackAvatar" />
-
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <h1 class="text-xl font-semibold tracking-tight text-gray-900 dark:text-white truncate">
-                          <span x-text="tweet.author.displayName || tweet.author.handle || 'Unknown'"></span>
-                        </h1>
-
-                        <!-- Verified badge (from verifications[].isValid OR verifiedStatus === 'valid') -->
-                        <template
-                          x-if="tweet.author.verification?.verifications?.isValid || tweet.author.verification?.verifiedStatus === 'valid'">
-                          <span
-                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800"
-                            title="Verified">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24"
-                              fill="currentColor" aria-hidden="true">
-                              <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                            </svg>
-                            Verified
-                          </span>
-                        </template>
-                      </div>
-
-                      <div
-                        class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-                        <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer" class="hover:underline"
-                          x-text="'@' + (tweet.author.handle || 'unknown')"></a>
-                        <span class="hidden sm:inline">•</span>
-                        <span class="truncate" :title="tweet.author.did" x-text="tweet.author.did"></span>
+                  <!-- Profile card (optional wrapper) -->
+                  <div
+                    class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:bg-neutral-900 dark:border-neutral-800">
+                    <!-- Banner behind everything -->
+                    <div class="absolute inset-x-0 top-0 h-28 sm:h-36 z-0">
+                      <img :src="tweet.author.banner" @error="$event.target.remove()" alt=""
+                        class="h-full w-full object-cover" loading="lazy" />
+                      <div class="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none">
                       </div>
                     </div>
 
-                    <!-- “Open Profile” button -->
-                    <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
-                      class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
-                      View Profile
-                    </a>
+                    <!-- Content above banner -->
+                    <div class="relative z-10 px-6 pt-20 sm:pt-24"> <!-- pad top to clear banner height -->
+                      <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <img :src="tweet.author.avatar || fallbackAvatar" @error="$event.target.src = fallbackAvatar"
+                          alt=""
+                          class="relative z-10 h-20 w-20 rounded-full object-cover ring-4 ring-white dark:ring-neutral-900" />
+
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-1">
+                            <h1 class="text-xl font-semibold tracking-tight text-gray-900 dark:text-white truncate">
+                              <span x-text="tweet.author.displayName || tweet.author.handle || 'Unknown'"></span>
+                            </h1>
+                            <!-- green check icon inline (no text) -->
+                            <template
+                              x-if="(tweet.author?.verifications || []).some(v => v?.isValid)
+                  || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
+                              <svg xmlns="http://www.w3.org/2000/svg"
+                                class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
+                                fill="currentColor" aria-label="Verified account" role="img">
+                                <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                              </svg>
+                            </template>
+                          </div>
+
+                          <div
+                            class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                            <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
+                              class="hover:underline" x-text="'@' + (tweet.author.handle || 'unknown')"></a>
+                            <span class="hidden sm:inline">•</span>
+                            <span class="truncate" :title="tweet.author.did" x-text="tweet.author.did"></span>
+                          </div>
+                        </div>
+
+                        <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
+                          class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
+                          View Profile
+                        </a>
+                      </div>
+                    </div>
                   </div>
+
 
                   <!-- Bio -->
                   <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
@@ -363,6 +386,7 @@
                 <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
               </div>
 
+              <p x-show="showOnlyAuthorProfile" class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
 
               <!-- Tweet Content (Full Width) -->
               <a :href="tweet.postUrl" target="_blank"
@@ -488,6 +512,8 @@
         showChart: false,
         showAllLanguages: false,
         showOnlyAuthorProfile: false,
+        postThreshold: 10,
+        noBigAccounts: false,
 
         async init() {
           this.addVisibilityListeners();
@@ -831,7 +857,7 @@
               // console.log({ series })
               this.chart.updateSeries(series);
             }
-            if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == 10) {
+            if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == this.postThreshold) {
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
 
@@ -859,6 +885,7 @@
                   db.authors.add({ ...authorProfile, refreshTime: Date.now() })
                   authorSave = { ...authorProfile, refreshTime: Date.now() }
                 }
+                if (this.noBigAccounts && authorSave.followersCount > 5000) return;
 
                 let verifiersSave = []
                 for (const verification of authorSave.verification?.verifications || []) {

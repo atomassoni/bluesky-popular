@@ -497,7 +497,10 @@
              rounded-xl shadow-2xl w-full max-w-lg p-5 border border-gray-200 dark:border-gray-700">
             <!-- Header -->
             <div class="flex justify-between items-center mb-4">
-              <h2 class="text-lg font-semibold">Replies</h2>
+              <h2 class="text-lg font-semibold">
+                Replies
+                <span x-text="`${replies.length} / ${rawReplies.length}`"></span>
+              </h2>
               <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 @click="showModalReplies = false">
                 &times;
@@ -510,13 +513,183 @@
             </div>
 
             <!-- Replies -->
-            <ul x-show="!loadingReplies" class="space-y-3 max-h-80 overflow-y-auto pr-1">
-              <template x-for="reply in replies" :key="reply.post.cid">
+            <ul x-show="!loadingReplies" class="space-y-3 max-h-80 overflow-y-auto pr-1" @scroll="maybeLoadMore($el)">
+              <template x-for="tweet in replies" :key="tweet.id">
                 <li class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg
                    bg-gray-50 dark:bg-gray-900/50">
-                  <p class="text-sm font-semibold" x-text="reply.post.author.displayName || reply.post.author.handle">
-                  </p>
-                  <p class="text-sm text-gray-700 dark:text-gray-300" x-text="reply.post.record.text"></p>
+                  <!-- start of tweet div -->
+                  <div class="r-post">
+                    <!-- tweet main -->
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
+                      <!-- Profile Card Component -->
+
+
+                      <!-- Parent Tweet -->
+                      <template x-if="tweet.parent">
+                        <div
+                          class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-3 flex items-start">
+                          <!-- Parent Tweet Avatar -->
+                          <img :src="tweet.parent.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                            class="w-6 h-6 rounded-full mr-3" />
+                          <!-- Parent Tweet Content -->
+                          <div class="flex-1">
+                            <p class="font-semibold text-gray-600 dark:text-gray-300">
+                              <span x-text="tweet.parent.userName || 'Anonymous'"></span>
+                              <span class="text-sm text-gray-500 dark:text-gray-400"
+                                x-text="'@' + (tweet.parent.userHandle || 'anonymous')"></span>
+                            </p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                              x-text="tweet.parent.content || 'Parent tweet not available'"></p>
+                          </div>
+                        </div>
+                      </template>
+
+                      <!-- Main Tweet -->
+
+                      <div x-show="!showOnlyAuthorProfile" x-cloak class="flex justify-between items-start mb-2">
+                        <!-- Left section (avatar, username, handle) -->
+                        <div class="flex items-center">
+                          <!-- Avatar -->
+                          <a :href="tweet.profileUrl" target="_blank" class="mr-4 flex-shrink-0">
+                            <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
+                              class="w-8 h-8 rounded-full" />
+                          </a>
+
+                          <!-- Name and handle (vertically centered) -->
+                          <div class="flex flex-col justify-center">
+                            <!-- name + check inline -->
+                            <div class="flex items-center gap-1">
+                              <a :href="tweet.profileUrl" target="_blank"
+                                class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                                x-text="tweet.userName"></a>
+
+                              <!-- green check, no text -->
+                              <template
+                                x-if="(tweet.author?.verifications || []).some(v => v?.isValid)
+            || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                  class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
+                                  fill="currentColor" aria-label="Verified account" role="img">
+                                  <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                              </template>
+                            </div>
+
+                            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></p>
+                          </div>
+
+                        </div>
+
+                        <!-- Right section (timestamp), aligned to top -->
+                        <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+                      </div>
+
+                      <p x-show="showOnlyAuthorProfile" class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+
+                      <!-- Tweet Content (Full Width) -->
+                      <a :href="tweet.postUrl" target="_blank"
+                        class="block mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
+                        x-text="tweet.content"></a>
+
+                      <!-- Images -->
+                      <div class="mt-2" x-show="tweet.images?.length > 0">
+                        <template x-for="image in tweet.images" :key="image">
+                          <a :href="tweet.postUrl" target="_blank" class="block mt-2">
+                            <img :src="image" alt="Tweet Image"
+                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                          </a>
+                        </template>
+                      </div>
+                      <!-- Video -->
+                      <div class="mt-2" x-show="tweet.video">
+                        <video :src="tweet.video" controls loop muted
+                          class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                      <!-- Embeds -->
+                      <template x-if="tweet.external">
+                        <div class="mt-4">
+                          <div
+                            class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
+                            <!-- Thumbnail -->
+                            <a :href="tweet.external.uri" target="_blank" class="block">
+                              <img x-show="tweet.external.imageSrc"
+                                :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
+                                :alt="tweet.external.alt" class="w-full object-contain" />
+                            </a>
+                            <!-- Content -->
+                            <div class="p-4" x-show="tweet.external.title">
+                              <a :href="tweet.external.uri" target="_blank" class="block">
+                                <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
+                                  x-text="tweet.external.title"></h3>
+                                <p class="text-gray-600 dark:text-gray-300 mt-2" x-text="tweet.external.description">
+                                </p>
+                              </a>
+                              <a :href="tweet.external.uri" target="_blank"
+                                class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
+                                <!-- SVG Icon -->
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
+                                  class="inline align-middle w-4 h-4">
+                                  <path
+                                    d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
+                                </svg>
+                                <!-- Hostname Text -->
+                                <span x-text="tweet.external.hostname" class="align-middle"></span>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+
+                      <!-- Quote Tweet -->
+                      <template x-if="tweet.quotePost">
+                        <div
+                          class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2 flex items-start">
+                          <!-- Parent Tweet Avatar -->
+                          <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'"
+                            alt="Reply Avatar" class="w-6 h-6 rounded-full mr-3" />
+                          <!-- Parent Tweet Content -->
+                          <div class="flex-1">
+                            <p class="font-semibold text-gray-600 dark:text-gray-300">
+                              <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                              <span class="text-sm text-gray-500 dark:text-gray-400"
+                                x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
+                            </p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                              x-text="tweet.quotePost.record.text || 'Parent tweet not available'"></p>
+                          </div>
+                        </div>
+                      </template>
+                      <!-- other counters -->
+                      <p class="text-sm text-gray-600 flex justify-between items-center space-x-4">
+                        <span>Likes: <span x-text="tweet.likeCount"></span></span>
+                        <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
+                        <span>Replies: <span x-text="tweet.replyCount"></span></span>
+                        <span>Reposts: <span x-text="tweet.repostCount"></span></span>
+                      </p>
+                      <!-- Like counter -->
+                      <p class="text-sm text-gray-500 mt-2"
+                        x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
+                      </p>
+
+                      <!-- view replies div -->
+                      <div>
+                        <!-- "view replies" button -->
+                        <button class="px-3 py-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
+                          View replies
+                        </button>
+
+
+                      </div>
+                    </div>
+
+                  </div>
                 </li>
               </template>
 
@@ -528,6 +701,10 @@
 
             <!-- Footer -->
             <div class="mt-5 text-right">
+              <p x-show="loadingMoreReplies && !loadingReplies"
+                class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                Loading more replies...
+              </p>
               <button class="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-700
                  text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
                 @click="showModalReplies = false">
@@ -577,9 +754,10 @@
         postThreshold: 10,
         noBigAccounts: false,
         loadingReplies: false,
+        loadingMoreReplies: false,
         showModalReplies: false,
         replies: [], // will be set only when modal for one post is open
-
+        rawReplies: [],
         async init() {
           this.addVisibilityListeners();
           this.startWebsocket();
@@ -637,18 +815,44 @@
             }
           }
         },
-        async loadReplies(uri) {
+        loadRepliesAtATime: 10,
+        async loadReplies(uri, startIndex) {
           this.loadingReplies = true;
           try {
+            this.replies = [];
             const res = await this.getPostThread(uri);
-            console.log(res);
+            // console.log(res);
             // { thread: { post: {...}, replies: [...] } }
-            this.replies = res.thread?.replies ?? [];
+            const replies = res.thread?.replies ?? [];
+            // transformReplyRecordToPost()
+            console.log("replies 0", replies[0])
+            this.rawReplies = replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0));
+            await this.loadMoreReplies();
           } catch (e) {
             console.error(e);
-            this.replies = []; // fallback so template doesn't explode
+            this.replies = [];
           } finally {
             this.loadingReplies = false;
+          }
+        },
+        async loadMoreReplies() {
+          this.loadingMoreReplies = true;
+          const currentIndex = this.replies.length;
+          try {
+            const newReplies = await Promise.all(this.rawReplies.slice(currentIndex, currentIndex + this.loadRepliesAtATime).map((r, i) => this.transformReplyRecordToPost(r, i)));
+            this.replies.push(...newReplies);
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loadingMoreReplies = false;
+          }
+        },
+        async maybeLoadMore(el) {
+          const threshold = 40; // px from bottom before triggering
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+            if (!this.loadingMoreReplies && this.replies.length < this.rawReplies.length) {
+              await this.loadMoreReplies();
+            }
           }
         },
         async loadBlob(databaseName, cid, repo) {
@@ -995,80 +1199,10 @@
                   return;
                 }
                 const { embed, langs } = record;
-                const newTweet = {
-                  id: likeCid,
-                  uri,
-                  timestamp: format(new Date(record.createdAt), {
-                    // addSuffix: true,
-                  }),
-                  totalLikeCount,
-                  replyCount,
-                  quoteCount,
-                  repostCount,
-                  createdAt: record.createdAt,
-                  content: record.text,
-                  userHandle: handle,
-                  userName: author.displayName,
-                  avatar: author.avatar,
-                  postorder: this.postorder,
-                  postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
-                  profileUrl: `https://bsky.app/profile/${handle}`,
-                  rkey,
-                  langs,
-                  author: authorSave,
-                  verifiers: verifiersSave
-                };
+                const newTweet = await this.transformLikeRecordToPost(uri, likeCid, postSave, authorSave, verifiersSave)
+
                 this.postorder++;
 
-                if (embed) {
-                  if (embed.$type?.includes("embed.images")) {
-                    newTweet.images = [];
-                    for (const img of embed.images) {
-                      console.log("IMG", img);
-                      const blob = await this.loadBlob(
-                        'images',
-                        img.image.ref.$link,
-                        repo
-                      );
-                      newTweet.images.push(URL.createObjectURL(blob));
-                    }
-                  } else if (embed.$type?.includes("embed.external")) {
-                    newTweet.external = {}; // embed;
-                    const { external } = embed;
-                    const { title, description, uri } = external;
-                    if (external.thumb) {
-                      const blob = await this.loadBlob(
-                        'images',
-                        external.thumb.ref.$link,
-                        repo
-                      );
-                      newTweet.external.imageSrc = URL.createObjectURL(blob);
-                    }
-                    if (description.toLowerCase()?.startsWith("alt")) {
-                      newTweet.external.alt = description;
-                      newTweet.external.gifSrc = uri;
-                    } else {
-                      newTweet.external.alt = "Thumbnail";
-                      newTweet.external.title = title;
-                      newTweet.external.description = description;
-                      newTweet.external.uri = uri;
-                      newTweet.external.hostname = new URL(uri).hostname;
-                    }
-                  } else if (embed.$type?.includes("embed.video")) {
-                    console.log("video", { embed })
-                    newTweet.videoLink = embed.video.ref.$link;
-                    newTweet.images = [
-                      "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
-                    ];
-                  } else if (embed.$type?.includes("embed.record")) {
-                    const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
-                    console.log({ quotedPost })
-                    newTweet.quotePost = quotedPost
-                  } else {
-                    console.log({ embed });
-
-                  }
-                }
                 if (this.likeTracker[uri]) {
                   const { likeCount, timesUs } = this.likeTracker[uri];
                   this.likeTracker[uri] = {
@@ -1117,6 +1251,236 @@
             console.log("Window focused, restarting WebSocket...");
             this.startWebsocket();
           });
+        },
+        async transformLikeRecordToPost(uri, likeCid, postSave, authorSave, verifiersSave) {
+
+          const [_, __, repo, collection, rkey] = uri.split("/");
+          const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+          const { handle, avatar, displayName } = author || {};
+          const { embed, langs } = record;
+
+          const newTweet = {
+            id: likeCid,
+            uri,
+            timestamp: format(new Date(record.createdAt), {
+              // addSuffix: true,
+            }),
+            totalLikeCount,
+            replyCount,
+            quoteCount,
+            repostCount,
+            createdAt: record.createdAt,
+            content: record.text,
+            userHandle: handle,
+            userName: author.displayName,
+            avatar: author.avatar,
+            postorder: this.postorder,
+            postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
+            profileUrl: `https://bsky.app/profile/${handle}`,
+            rkey,
+            langs,
+            author: authorSave,
+            verifiers: verifiersSave
+          };
+          //get embeds async pull out?
+          if (embed) {
+            if (embed.$type?.includes("embed.images")) {
+              newTweet.images = [];
+              for (const img of embed.images) {
+                console.log("IMG", img);
+                const blob = await this.loadBlob(
+                  'images',
+                  img.image.ref.$link,
+                  repo
+                );
+                newTweet.images.push(URL.createObjectURL(blob));
+              }
+            } else if (embed.$type?.includes("embed.external")) {
+              newTweet.external = {}; // embed;
+              const { external } = embed;
+              const { title, description, uri } = external;
+              if (external.thumb) {
+                const blob = await this.loadBlob(
+                  'images',
+                  external.thumb.ref.$link,
+                  repo
+                );
+                newTweet.external.imageSrc = URL.createObjectURL(blob);
+              }
+              if (description.toLowerCase()?.startsWith("alt")) {
+                newTweet.external.alt = description;
+                newTweet.external.gifSrc = uri;
+              } else {
+                newTweet.external.alt = "Thumbnail";
+                newTweet.external.title = title;
+                newTweet.external.description = description;
+                newTweet.external.uri = uri;
+                newTweet.external.hostname = new URL(uri).hostname;
+              }
+            } else if (embed.$type?.includes("embed.video")) {
+              console.log("video", { embed })
+              newTweet.videoLink = embed.video.ref.$link;
+              newTweet.images = [
+                "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
+              ];
+            } else if (embed.$type?.includes("embed.record")) {
+              const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
+              console.log({ quotedPost })
+              newTweet.quotePost = quotedPost
+            } else {
+              console.log({ embed });
+
+            }
+          }
+          return newTweet
+
+        },
+        async transformReplyRecordToPost(replyRecord, postorder) {
+          console.log({ replyRecord });
+
+          const { $type, post, replies, threadContext } = replyRecord || {}
+          const { uri,
+            cid,
+            author,
+            record,
+            bookmarkCount,
+            replyCount,
+            repostCount,
+            likeCount,
+            quoteCount,
+            indexedAt,
+            labels } = post || {}
+          // {
+          //     "$type": "app.bsky.feed.defs#threadViewPost",
+          //     "post": {
+          //         "uri": "at://did:plc:zye4vbfl2pnd2dzm6a2tcss5/app.bsky.feed.post/3m5rhfog2gs25",
+          //         "cid": "bafyreiekq42aekrowjebeb5hpidyw6jowzklevunxottkas3czkkvf33ua",
+          //         "author": {
+          //             "did": "did:plc:zye4vbfl2pnd2dzm6a2tcss5",
+          //             "handle": "antitractionist.bsky.social",
+          //             "displayName": "Blue Eyes White Macron",
+          //             "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:zye4vbfl2pnd2dzm6a2tcss5/bafkreifhtegpddctgqezm6hy2yamnohwkcaw6xwvjeeifdyjn6z77omffy@jpeg",
+          //             "associated": {
+          //                 "activitySubscription": {
+          //                     "allowSubscriptions": "followers"
+          //                 }
+          //             },
+          //             "labels": [],
+          //             "createdAt": "2023-08-22T01:45:52.454Z"
+          //         },
+          //         "record": {
+          //             "$type": "app.bsky.feed.post",
+          //             "createdAt": "2025-11-16T19:36:02.414Z",
+          //             "langs": [
+          //                 "en"
+          //             ],
+          //             "reply": {
+          //                 "parent": {
+          //                     "cid": "bafyreiettido5ez4sip37dnrkpi7w4wdxdzqybjrshdzubjjn7ox2csv3q",
+          //                     "uri": "at://did:plc:ux34natbhxube3xgdu3rhf45/app.bsky.feed.post/3m5rhej42gk2j"
+          //                 },
+          //                 "root": {
+          //                     "cid": "bafyreiettido5ez4sip37dnrkpi7w4wdxdzqybjrshdzubjjn7ox2csv3q",
+          //                     "uri": "at://did:plc:ux34natbhxube3xgdu3rhf45/app.bsky.feed.post/3m5rhej42gk2j"
+          //                 }
+          //             },
+          //             "text": "Is it happening??"
+          //         },
+          //         "bookmarkCount": 0,
+          //         "replyCount": 0,
+          //         "repostCount": 0,
+          //         "likeCount": 0,
+          //         "quoteCount": 0,
+          //         "indexedAt": "2025-11-16T19:36:04.760Z",
+          //         "labels": []
+          //     },
+          //     "replies": [],
+          //     "threadContext": {}
+          // }
+          if (!uri) return;
+          const [_, __, repo, collection, rkey] = uri.split("/");
+          const { did, handle, displayName, avatar, labels: authorLabels, associated, createdAt: authorCreatedAt } = author || {}
+
+          const { $type: recordType, createdAt, langs, reply, embed, text } = record || {}
+          const { parent, root } = reply || {}
+          const { activitySubscription } = associated
+
+          const newTweet = {
+            id: cid,
+            uri,
+            timestamp: format(new Date(createdAt), {
+              // addSuffix: true,
+            }),
+            likeCount,
+            replyCount,
+            quoteCount,
+            repostCount,
+            bookmarkCount,
+            createdAt,
+            content: text,
+            userHandle: handle,
+            userName: displayName,
+            avatar: avatar,
+            postorder,
+            postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
+            profileUrl: `https://bsky.app/profile/${handle}`,
+            rkey,
+            langs,
+            author,
+            verifiers: {}
+          };
+          //get embeds async pull out?
+          if (embed) {
+            if (embed.$type?.includes("embed.images")) {
+              newTweet.images = [];
+              for (const img of embed.images) {
+                console.log("IMG", img);
+                const blob = await this.loadBlob(
+                  'images',
+                  img.image.ref.$link,
+                  repo
+                );
+                newTweet.images.push(URL.createObjectURL(blob));
+              }
+            } else if (embed.$type?.includes("embed.external")) {
+              newTweet.external = {}; // embed;
+              const { external } = embed;
+              const { title, description, uri } = external;
+              if (external.thumb) {
+                const blob = await this.loadBlob(
+                  'images',
+                  external.thumb.ref.$link,
+                  repo
+                );
+                newTweet.external.imageSrc = URL.createObjectURL(blob);
+              }
+              if (description.toLowerCase()?.startsWith("alt")) {
+                newTweet.external.alt = description;
+                newTweet.external.gifSrc = uri;
+              } else {
+                newTweet.external.alt = "Thumbnail";
+                newTweet.external.title = title;
+                newTweet.external.description = description;
+                newTweet.external.uri = uri;
+                newTweet.external.hostname = new URL(uri).hostname;
+              }
+            } else if (embed.$type?.includes("embed.video")) {
+              console.log("video", { embed })
+              newTweet.videoLink = embed.video.ref.$link;
+              newTweet.images = [
+                "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
+              ];
+            } else if (embed.$type?.includes("embed.record")) {
+              const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
+              console.log({ quotedPost })
+              newTweet.quotePost = quotedPost
+            } else {
+              console.log({ embed });
+
+            }
+          }
+          return newTweet
+
         },
         async getServices(actorIdentifier) {
           const endpoint =

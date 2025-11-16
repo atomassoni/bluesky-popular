@@ -471,7 +471,68 @@
               <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
               </p>
 
+            <!-- view replies div -->
+            <div>
+              <!-- "view replies" button -->
+              <button class="px-3 py-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
+                View replies
+              </button>
+
+              <!-- Modal overlay -->
+              <div x-show="showModalReplies" x-cloak
+                class="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+                <!-- Modal box -->
+                <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+             rounded-xl shadow-2xl w-full max-w-lg p-5 border border-gray-200 dark:border-gray-700">
+                  <!-- Header -->
+                  <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold">Replies</h2>
+                    <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                      @click="showModalReplies = false">
+                      &times;
+                    </button>
+                  </div>
+
+                  <!-- Loading state -->
+                  <div x-show="loadingReplies" class="text-sm text-gray-500 dark:text-gray-400">
+                    Loading replies…
+                  </div>
+
+                  <!-- Replies -->
+                  <ul x-show="!loadingReplies" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    <template x-for="reply in replies" :key="reply.post.cid">
+                      <li class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg
+                   bg-gray-50 dark:bg-gray-900/50">
+                        <p class="text-sm font-semibold"
+                          x-text="reply.post.author.displayName || reply.post.author.handle"></p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300" x-text="reply.post.record.text"></p>
+                      </li>
+                    </template>
+
+                    <p x-show="!loadingReplies && (!replies || replies.length === 0)"
+                      class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      No replies yet.
+                    </p>
+                  </ul>
+
+                  <!-- Footer -->
+                  <div class="mt-5 text-right">
+                    <button class="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-700
+                 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      @click="showModalReplies = false">
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
+            </div>
+  
           </div>
         </template>
       </div>
@@ -514,6 +575,9 @@
         showOnlyAuthorProfile: false,
         postThreshold: 10,
         noBigAccounts: false,
+        loadingReplies: false,
+        showModalReplies: false,
+        replies: [], // will be set only when modal for one post is open
 
         async init() {
           this.addVisibilityListeners();
@@ -570,6 +634,20 @@
             } catch (err) {
               console.error(err)
             }
+          }
+        },
+        async loadReplies(uri) {
+          this.loadingReplies = true;
+          try {
+            const res = await this.getPostThread(uri);
+            console.log(res);
+            // { thread: { post: {...}, replies: [...] } }
+            this.replies = res.thread?.replies ?? [];
+          } catch (e) {
+            console.error(e);
+            this.replies = []; // fallback so template doesn't explode
+          } finally {
+            this.loadingReplies = false;
           }
         },
         async loadBlob(databaseName, cid, repo) {
@@ -868,8 +946,8 @@
                 }
                 if (!postSave) {
                   postSave = (await this.getPosts(uri))?.posts[0];
-                  const postThread = await this.getPostThread(uri)
-                  console.log({ postThread })
+                  // const postThread = await this.getPostThread(uri)
+                  // console.log({ postThread })
                   console.log({ postSave }, likeCid, postSave.cid)
                   db.posts.add({ ...postSave, refreshTime: Date.now() })
                 }
@@ -885,7 +963,9 @@
                   db.authors.add({ ...authorProfile, refreshTime: Date.now() })
                   authorSave = { ...authorProfile, refreshTime: Date.now() }
                 }
-                if (this.noBigAccounts && authorSave.followersCount > 5000) return;
+                const ratio = authorSave.followersCount / totalLikeCount
+                console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
+                if (this.noBigAccounts && ratio > 25) return;
 
                 let verifiersSave = []
                 for (const verification of authorSave.verification?.verifications || []) {
@@ -916,6 +996,7 @@
                 const { embed, langs } = record;
                 const newTweet = {
                   id: likeCid,
+                  uri,
                   timestamp: format(new Date(record.createdAt), {
                     // addSuffix: true,
                   }),

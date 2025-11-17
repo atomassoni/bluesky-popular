@@ -473,8 +473,15 @@
 
               <!-- view replies div -->
               <div>
-                <!-- todo load more replies? -->
-
+                <!-- "view replies" button -->
+                <button class="px-3 py-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
+                  View replies
+                </button>
               </div>
             </div>
 
@@ -642,17 +649,7 @@
 
                       <!-- view replies div -->
                       <div>
-                        <!-- "view replies" button -->
-                        <button class="px-3 py-1.5 text-sm rounded-md
-           bg-gray-100 text-gray-800 border border-gray-300
-           hover:bg-gray-200 hover:border-gray-400
-           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
-           dark:hover:bg-gray-600 dark:hover:border-gray-500
-           transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
-                          View replies
-                        </button>
-
-
+                        <!-- "view replies" todo load more replies -->
                       </div>
                     </div>
 

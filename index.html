@@ -473,16 +473,7 @@
 
               <!-- view replies div -->
               <div>
-                <!-- "view replies" button -->
-                <button class="px-3 py-1.5 text-sm rounded-md
-           bg-gray-100 text-gray-800 border border-gray-300
-           hover:bg-gray-200 hover:border-gray-400
-           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
-           dark:hover:bg-gray-600 dark:hover:border-gray-500
-           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
-                  View replies
-                </button>
-
+                <!-- todo load more replies? -->
 
               </div>
             </div>
@@ -515,38 +506,16 @@
             <!-- Replies -->
             <ul x-show="!loadingReplies" class="space-y-3 max-h-80 overflow-y-auto pr-1" @scroll="maybeLoadMore($el)">
               <template x-for="tweet in replies" :key="tweet.id">
-                <li class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg
-                   bg-gray-50 dark:bg-gray-900/50">
+                <li class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50"
+                  :class="tweet.uri !== activeReply 
+             ? 'ml-6 border-l-2 border-gray-300 dark:border-gray-700 pl-4' 
+             : ''">
                   <!-- start of tweet div -->
                   <div class="r-post">
                     <!-- tweet main -->
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
-                      <!-- Profile Card Component -->
 
-
-                      <!-- Parent Tweet -->
-                      <template x-if="tweet.parent">
-                        <div
-                          class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-3 flex items-start">
-                          <!-- Parent Tweet Avatar -->
-                          <img :src="tweet.parent.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
-                            class="w-6 h-6 rounded-full mr-3" />
-                          <!-- Parent Tweet Content -->
-                          <div class="flex-1">
-                            <p class="font-semibold text-gray-600 dark:text-gray-300">
-                              <span x-text="tweet.parent.userName || 'Anonymous'"></span>
-                              <span class="text-sm text-gray-500 dark:text-gray-400"
-                                x-text="'@' + (tweet.parent.userHandle || 'anonymous')"></span>
-                            </p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
-                              x-text="tweet.parent.content || 'Parent tweet not available'"></p>
-                          </div>
-                        </div>
-                      </template>
-
-                      <!-- Main Tweet -->
-
-                      <div x-show="!showOnlyAuthorProfile" x-cloak class="flex justify-between items-start mb-2">
+                      <div x-cloak class="flex justify-between items-start mb-2">
                         <!-- Left section (avatar, username, handle) -->
                         <div class="flex items-center">
                           <!-- Avatar -->
@@ -583,8 +552,6 @@
                         <!-- Right section (timestamp), aligned to top -->
                         <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
                       </div>
-
-                      <p x-show="showOnlyAuthorProfile" class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
 
                       <!-- Tweet Content (Full Width) -->
                       <a :href="tweet.postUrl" target="_blank"
@@ -681,7 +648,7 @@
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
-           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
+           transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
                           View replies
                         </button>
 
@@ -758,6 +725,7 @@
         showModalReplies: false,
         replies: [], // will be set only when modal for one post is open
         rawReplies: [],
+        activeReply: "",
         async init() {
           this.addVisibilityListeners();
           this.startWebsocket();
@@ -815,18 +783,33 @@
             }
           }
         },
-        loadRepliesAtATime: 10,
-        async loadReplies(uri, startIndex) {
+        numRepliesToLoad: 10,
+        async getAllParents(reply) {
+          let parent = reply;
+          while (parent) {
+            this.rawReplies.unshift(parent);
+            parent = parent.parent;//uh ok
+          }
+        },
+        async loadReplyThread(uri) {
+          this.activeReply = uri;
           this.loadingReplies = true;
           try {
+            this.rawReplies = []
             this.replies = [];
             const res = await this.getPostThread(uri);
-            // console.log(res);
+            console.log(res);
+            if (res.thread?.parent) {
+              //get all parents 
+              this.getAllParents(res.thread.parent)
+              console.log({ parent })
+            }
             // { thread: { post: {...}, replies: [...] } }
             const replies = res.thread?.replies ?? [];
+            this.rawReplies.push(res.thread)
             // transformReplyRecordToPost()
-            console.log("replies 0", replies[0])
-            this.rawReplies = replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0));
+            console.log("replies 0", replies[0]);
+            this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
             await this.loadMoreReplies();
           } catch (e) {
             console.error(e);
@@ -839,7 +822,8 @@
           this.loadingMoreReplies = true;
           const currentIndex = this.replies.length;
           try {
-            const newReplies = await Promise.all(this.rawReplies.slice(currentIndex, currentIndex + this.loadRepliesAtATime).map((r, i) => this.transformReplyRecordToPost(r, i)));
+            //this breaks if the post's index is greater than the number of replies
+            const newReplies = await Promise.all(this.rawReplies.slice(currentIndex, currentIndex + this.numRepliesToLoad).map((r, i) => this.transformReplyRecordToPost(r, i)));
             this.replies.push(...newReplies);
           } catch (err) {
             console.error(err);
@@ -1259,7 +1243,7 @@
           const { handle, avatar, displayName } = author || {};
           const { embed, langs } = record;
 
-          const newTweet = {
+          let newTweet = {
             id: likeCid,
             uri,
             timestamp: format(new Date(record.createdAt), {
@@ -1284,53 +1268,7 @@
           };
           //get embeds async pull out?
           if (embed) {
-            if (embed.$type?.includes("embed.images")) {
-              newTweet.images = [];
-              for (const img of embed.images) {
-                console.log("IMG", img);
-                const blob = await this.loadBlob(
-                  'images',
-                  img.image.ref.$link,
-                  repo
-                );
-                newTweet.images.push(URL.createObjectURL(blob));
-              }
-            } else if (embed.$type?.includes("embed.external")) {
-              newTweet.external = {}; // embed;
-              const { external } = embed;
-              const { title, description, uri } = external;
-              if (external.thumb) {
-                const blob = await this.loadBlob(
-                  'images',
-                  external.thumb.ref.$link,
-                  repo
-                );
-                newTweet.external.imageSrc = URL.createObjectURL(blob);
-              }
-              if (description.toLowerCase()?.startsWith("alt")) {
-                newTweet.external.alt = description;
-                newTweet.external.gifSrc = uri;
-              } else {
-                newTweet.external.alt = "Thumbnail";
-                newTweet.external.title = title;
-                newTweet.external.description = description;
-                newTweet.external.uri = uri;
-                newTweet.external.hostname = new URL(uri).hostname;
-              }
-            } else if (embed.$type?.includes("embed.video")) {
-              console.log("video", { embed })
-              newTweet.videoLink = embed.video.ref.$link;
-              newTweet.images = [
-                "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
-              ];
-            } else if (embed.$type?.includes("embed.record")) {
-              const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
-              console.log({ quotedPost })
-              newTweet.quotePost = quotedPost
-            } else {
-              console.log({ embed });
-
-            }
+            newTweet = await this.loadEmbedDetails(newTweet, embed, repo)
           }
           return newTweet
 
@@ -1338,7 +1276,7 @@
         async transformReplyRecordToPost(replyRecord, postorder) {
           console.log({ replyRecord });
 
-          const { $type, post, replies, threadContext } = replyRecord || {}
+          const { $type, post, replies, threadContext, parent: threadParent, } = replyRecord || {}
           const { uri,
             cid,
             author,
@@ -1405,7 +1343,7 @@
           const { parent, root } = reply || {}
           const { activitySubscription } = associated
 
-          const newTweet = {
+          let newTweet = {
             id: cid,
             uri,
             timestamp: format(new Date(createdAt), {
@@ -1431,56 +1369,60 @@
           };
           //get embeds async pull out?
           if (embed) {
-            if (embed.$type?.includes("embed.images")) {
-              newTweet.images = [];
-              for (const img of embed.images) {
-                console.log("IMG", img);
-                const blob = await this.loadBlob(
-                  'images',
-                  img.image.ref.$link,
-                  repo
-                );
-                newTweet.images.push(URL.createObjectURL(blob));
-              }
-            } else if (embed.$type?.includes("embed.external")) {
-              newTweet.external = {}; // embed;
-              const { external } = embed;
-              const { title, description, uri } = external;
-              if (external.thumb) {
-                const blob = await this.loadBlob(
-                  'images',
-                  external.thumb.ref.$link,
-                  repo
-                );
-                newTweet.external.imageSrc = URL.createObjectURL(blob);
-              }
-              if (description.toLowerCase()?.startsWith("alt")) {
-                newTweet.external.alt = description;
-                newTweet.external.gifSrc = uri;
-              } else {
-                newTweet.external.alt = "Thumbnail";
-                newTweet.external.title = title;
-                newTweet.external.description = description;
-                newTweet.external.uri = uri;
-                newTweet.external.hostname = new URL(uri).hostname;
-              }
-            } else if (embed.$type?.includes("embed.video")) {
-              console.log("video", { embed })
-              newTweet.videoLink = embed.video.ref.$link;
-              newTweet.images = [
-                "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
-              ];
-            } else if (embed.$type?.includes("embed.record")) {
-              const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
-              console.log({ quotedPost })
-              newTweet.quotePost = quotedPost
-            } else {
-              console.log({ embed });
-
-            }
+            newTweet = await this.loadEmbedDetails(newTweet, embed, repo)
           }
           return newTweet
 
+        },
+        async loadEmbedDetails(newTweet, embed, repo) {
+          if (embed.$type?.includes("embed.images")) {
+            newTweet.images = [];
+            for (const img of embed.images) {
+              console.log("IMG", img);
+              const blob = await this.loadBlob(
+                'images',
+                img.image.ref.$link,
+                repo
+              );
+              newTweet.images.push(URL.createObjectURL(blob));
+            }
+          } else if (embed.$type?.includes("embed.external")) {
+            newTweet.external = {}; // embed;
+            const { external } = embed;
+            const { title, description, uri } = external;
+            if (external.thumb) {
+              const blob = await this.loadBlob(
+                'images',
+                external.thumb.ref.$link,
+                repo
+              );
+              newTweet.external.imageSrc = URL.createObjectURL(blob);
+            }
+            if (description.toLowerCase()?.startsWith("alt")) {
+              newTweet.external.alt = description;
+              newTweet.external.gifSrc = uri;
+            } else {
+              newTweet.external.alt = "Thumbnail";
+              newTweet.external.title = title;
+              newTweet.external.description = description;
+              newTweet.external.uri = uri;
+              newTweet.external.hostname = new URL(uri).hostname;
+            }
+          } else if (embed.$type?.includes("embed.video")) {
+            console.log("video", { embed })
+            newTweet.videoLink = embed.video.ref.$link;
+            newTweet.images = [
+              "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
+            ];
+          } else if (embed.$type?.includes("embed.record")) {
+            const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
+            console.log({ quotedPost })
+            newTweet.quotePost = quotedPost
+          } else {
+            console.log({ embed });
+
+          }
+          return newTweet
         },
         async getServices(actorIdentifier) {
           const endpoint =

@@ -461,10 +461,11 @@
                 </div>
               </template>
               <!-- other counters -->
-              <p class="text-sm text-gray-600 flex justify-between items-center space-x-4">
+              <p class="text-sm mt-2 text-gray-600 flex justify-between items-center space-x-4">
                 <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
                 <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                 <span>Replies: <span x-text="tweet.replyCount"></span></span>
+                <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
                 <span>Reposts: <span x-text="tweet.repostCount"></span></span>
               </p>
               <!-- Like counter -->
@@ -474,13 +475,13 @@
               <!-- view replies div -->
               <div>
                 <!-- "view replies" button -->
-                <button class="px-3 py-1.5 text-sm rounded-md
+                <button class="px-3 py-1.5 mt-2 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
-                  View replies
+                  View thread
                 </button>
               </div>
             </div>
@@ -496,7 +497,7 @@
             <!-- Header -->
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-lg font-semibold">
-                Replies
+                Thread
                 <span x-text="`${replies.length} / ${rawReplies.length}`"></span>
               </h2>
               <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -509,21 +510,17 @@
             <div x-show="loadingReplies" class="text-sm text-gray-500 dark:text-gray-400">
               Loading replies…
             </div>
-
             <!-- Replies -->
-            <ul x-show="!loadingReplies" class="space-y-3 max-h-80 overflow-y-auto pr-1" @scroll="maybeLoadMore($el)">
+            <ul x-show="!loadingReplies"
+              class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
+              @scroll="maybeLoadMore($el)">
               <template x-for="tweet in replies" :key="tweet.id">
-                <li class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50"
-                  :class="tweet.uri !== activeReply 
-             ? 'ml-6 border-l-2 border-gray-300 dark:border-gray-700 pl-4' 
-             : ''">
-                  <!-- start of tweet div -->
-                  <div class="r-post">
-                    <!-- tweet main -->
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
-
-                      <div x-cloak class="flex justify-between items-start mb-2">
-                        <!-- Left section (avatar, username, handle) -->
+                <li class="py-3">
+                  <!-- ACTIVE REPLY: text starts FLUSH under avatar -->
+                  <template x-if="tweet.uri === activeReply">
+                    <div>
+                      <!-- Header: avatar + name/handle + timestamp -->
+                      <div class="flex justify-between items-start mb-2">
                         <div class="flex items-center">
                           <!-- Avatar -->
                           <a :href="tweet.profileUrl" target="_blank" class="mr-4 flex-shrink-0">
@@ -531,9 +528,8 @@
                               class="w-8 h-8 rounded-full" />
                           </a>
 
-                          <!-- Name and handle (vertically centered) -->
+                          <!-- Name + handle + check -->
                           <div class="flex flex-col justify-center">
-                            <!-- name + check inline -->
                             <div class="flex items-center gap-1">
                               <a :href="tweet.profileUrl" target="_blank"
                                 class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
@@ -542,7 +538,7 @@
                               <!-- green check, no text -->
                               <template
                                 x-if="(tweet.author?.verifications || []).some(v => v?.isValid)
-            || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
+                      || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
                                 <svg xmlns="http://www.w3.org/2000/svg"
                                   class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
                                   fill="currentColor" aria-label="Verified account" role="img">
@@ -550,19 +546,17 @@
                                 </svg>
                               </template>
                             </div>
-
                             <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></p>
                           </div>
-
                         </div>
 
-                        <!-- Right section (timestamp), aligned to top -->
+                        <!-- Timestamp -->
                         <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
                       </div>
 
-                      <!-- Tweet Content (Full Width) -->
+                      <!-- CONTENT: flush with avatar (no left margin) -->
                       <a :href="tweet.postUrl" target="_blank"
-                        class="block mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
+                        class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
                         x-text="tweet.content"></a>
 
                       <!-- Images -->
@@ -570,29 +564,28 @@
                         <template x-for="image in tweet.images" :key="image">
                           <a :href="tweet.postUrl" target="_blank" class="block mt-2">
                             <img :src="image" alt="Tweet Image"
-                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                              class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           </a>
                         </template>
                       </div>
+
                       <!-- Video -->
                       <div class="mt-2" x-show="tweet.video">
                         <video :src="tweet.video" controls loop muted
-                          class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                          class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                           Your browser does not support the video tag.
                         </video>
                       </div>
+
                       <!-- Embeds -->
                       <template x-if="tweet.external">
                         <div class="mt-4">
-                          <div
-                            class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
-                            <!-- Thumbnail -->
+                          <div class="border border-gray-300 dark:border-gray-700 overflow-hidden">
                             <a :href="tweet.external.uri" target="_blank" class="block">
                               <img x-show="tweet.external.imageSrc"
                                 :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
                                 :alt="tweet.external.alt" class="w-full object-contain" />
                             </a>
-                            <!-- Content -->
                             <div class="p-4" x-show="tweet.external.title">
                               <a :href="tweet.external.uri" target="_blank" class="block">
                                 <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
@@ -608,7 +601,6 @@
                                   <path
                                     d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
                                 </svg>
-                                <!-- Hostname Text -->
                                 <span x-text="tweet.external.hostname" class="align-middle"></span>
                               </a>
                             </div>
@@ -619,11 +611,9 @@
                       <!-- Quote Tweet -->
                       <template x-if="tweet.quotePost">
                         <div
-                          class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2 flex items-start">
-                          <!-- Parent Tweet Avatar -->
+                          class="mt-2 flex items-start border border-gray-300 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-700">
                           <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'"
                             alt="Reply Avatar" class="w-6 h-6 rounded-full mr-3" />
-                          <!-- Parent Tweet Content -->
                           <div class="flex-1">
                             <p class="font-semibold text-gray-600 dark:text-gray-300">
                               <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
@@ -635,25 +625,136 @@
                           </div>
                         </div>
                       </template>
-                      <!-- other counters -->
-                      <p class="text-sm text-gray-600 flex justify-between items-center space-x-4">
+
+                      <!-- Counters -->
+                      <p class="mt-2 text-sm text-gray-600 flex justify-between items-center space-x-4">
                         <span>Likes: <span x-text="tweet.likeCount"></span></span>
                         <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                         <span>Replies: <span x-text="tweet.replyCount"></span></span>
+                        <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
                         <span>Reposts: <span x-text="tweet.repostCount"></span></span>
                       </p>
-                      <!-- Like counter -->
-                      <p class="text-sm text-gray-500 mt-2"
-                        x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
-                      </p>
+                    </div>
+                  </template>
 
-                      <!-- view replies div -->
-                      <div>
-                        <!-- "view replies" todo load more replies -->
+                  <!-- NON-ACTIVE REPLIES: avatar indented/smaller, text under NAME -->
+                  <template x-if="tweet.uri !== activeReply">
+                    <div class="mt-2 flex items-start px-3 py-2 ">
+                      <!-- reply avatar -->
+                      <a :href="tweet.profileUrl" target="_blank">
+                        <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
+                          class="w-8 h-8 rounded-full mr-3" />
+                      </a>
+                      <!-- Name + handle + check -->
+
+                      <div class="flex-1">
+                        <p class="font-semibold text-gray-600 dark:text-gray-300">
+                          <span>
+                            <a :href="tweet.profileUrl" target="_blank"
+                              class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                              x-text="tweet.userName"></a>
+                          </span>
+                          <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></span>
+
+                        </p>
+                        <!-- Timestamp -->
+                        <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+
+
+                        <!-- Content (aligned under NAME) -->
+                        <a :href="tweet.postUrl" target="_blank"
+                          class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
+                          x-text="tweet.content"></a>
+
+                        <!-- Images -->
+                        <div class="mt-2" x-show="tweet.images?.length > 0">
+                          <template x-for="image in tweet.images" :key="image">
+                            <a :href="tweet.postUrl" target="_blank" class="block mt-2">
+                              <img :src="image" alt="Tweet Image"
+                                class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                            </a>
+                          </template>
+                        </div>
+
+                        <!-- Video -->
+                        <div class="mt-2" x-show="tweet.video">
+                          <video :src="tweet.video" controls loop muted
+                            class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                            Your browser does not support the video tag.
+                          </video>
+                        </div>
+
+                        <!-- Embeds -->
+                        <template x-if="tweet.external">
+                          <div class="mt-4">
+                            <div class="border border-gray-300 dark:border-gray-700 overflow-hidden">
+                              <a :href="tweet.external.uri" target="_blank" class="block">
+                                <img x-show="tweet.external.imageSrc"
+                                  :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
+                                  :alt="tweet.external.alt" class="w-full object-contain" />
+                              </a>
+                              <div class="p-4" x-show="tweet.external.title">
+                                <a :href="tweet.external.uri" target="_blank" class="block">
+                                  <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
+                                    x-text="tweet.external.title"></h3>
+                                  <p class="text-gray-600 dark:text-gray-300 mt-2" x-text="tweet.external.description">
+                                  </p>
+                                </a>
+                                <a :href="tweet.external.uri" target="_blank"
+                                  class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
+                                    class="inline align-middle w-4 h-4">
+                                    <path
+                                      d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
+                                  </svg>
+                                  <span x-text="tweet.external.hostname" class="align-middle"></span>
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        </template>
+
+                        <!-- Quote Tweet -->
+                        <template x-if="tweet.quotePost">
+                          <div
+                            class="mt-2 flex items-start border border-gray-300 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-700">
+                            <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'"
+                              alt="Reply Avatar" class="w-6 h-6 rounded-full mr-3" />
+                            <div class="flex-1">
+                              <p class="font-semibold text-gray-600 dark:text-gray-300">
+                                <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400"
+                                  x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
+                              </p>
+                              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                                x-text="tweet.quotePost.record.text || 'Parent tweet not available'"></p>
+                            </div>
+                          </div>
+                        </template>
+
+
+                        <!-- Counters -->
+                        <p class="mt-2 text-sm text-gray-600 flex justify-between items-center space-x-4">
+                          <span>Likes: <span x-text="tweet.likeCount"></span></span>
+                          <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
+                          <span>Replies: <span x-text="tweet.replyCount"></span></span>
+                          <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
+                          <span>Reposts: <span x-text="tweet.repostCount"></span></span>
+                        </p>
+                        <!-- "view replies" button -->
+                        <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
+                          View thread
+                        </button>
                       </div>
                     </div>
 
-                  </div>
+                  </template>
+
                 </li>
               </template>
 
@@ -1137,11 +1238,12 @@
                   console.log({ postSave }, likeCid, postSave.cid)
                   db.posts.add({ ...postSave, refreshTime: Date.now() })
                 }
-                const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+                const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+                if (!record) return;
 
                 const { handle, avatar, displayName } = author || {};
                 let authorSave = await db.authors.get({ handle })
-                console.log({ authorSave })
+                // console.log({ authorSave })
                 //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
                 if (!authorSave) { //refresh time over 24 hours ago
                   const authorProfile = await this.getProfile(repo);
@@ -1166,7 +1268,6 @@
                   }
                 }
 
-                if (!record) return;
                 if (labels.length) {
                   for (const { val } of labels) {
                     ///this will count every like 
@@ -1179,9 +1280,7 @@
                   console.log("labels", Object.keys(this.labelTracker))
                   return;
                 }
-                const { embed, langs } = record;
-                const newTweet = await this.transformLikeRecordToPost(uri, likeCid, postSave, authorSave, verifiersSave)
-
+                const newTweet = await this.transformPost(postSave, this.postorder, authorSave, verifiersSave)
                 this.postorder++;
 
                 if (this.likeTracker[uri]) {
@@ -1233,15 +1332,15 @@
             this.startWebsocket();
           });
         },
-        async transformLikeRecordToPost(uri, likeCid, postSave, authorSave, verifiersSave) {
+        async transformPost(post, postorder, authorSave = {}, verifiersSave = {}) {
 
+          const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
-          const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
           const { handle, avatar, displayName } = author || {};
           const { embed, langs } = record;
 
           let newTweet = {
-            id: likeCid,
+            id: cid,
             uri,
             timestamp: format(new Date(record.createdAt), {
               // addSuffix: true,
@@ -1250,12 +1349,13 @@
             replyCount,
             quoteCount,
             repostCount,
+            bookmarkCount,
             createdAt: record.createdAt,
             content: record.text,
             userHandle: handle,
             userName: author.displayName,
             avatar: author.avatar,
-            postorder: this.postorder,
+            postorder: postorder,
             postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
             profileUrl: `https://bsky.app/profile/${handle}`,
             rkey,
@@ -1268,108 +1368,16 @@
             newTweet = await this.loadEmbedDetails(newTweet, embed, repo)
           }
           return newTweet
-
         },
         async transformReplyRecordToPost(replyRecord, postorder) {
           console.log({ replyRecord });
-
-          const { $type, post, replies, threadContext, parent: threadParent, } = replyRecord || {}
-          const { uri,
-            cid,
-            author,
-            record,
-            bookmarkCount,
-            replyCount,
-            repostCount,
-            likeCount,
-            quoteCount,
-            indexedAt,
-            labels } = post || {}
-          // {
-          //     "$type": "app.bsky.feed.defs#threadViewPost",
-          //     "post": {
-          //         "uri": "at://did:plc:zye4vbfl2pnd2dzm6a2tcss5/app.bsky.feed.post/3m5rhfog2gs25",
-          //         "cid": "bafyreiekq42aekrowjebeb5hpidyw6jowzklevunxottkas3czkkvf33ua",
-          //         "author": {
-          //             "did": "did:plc:zye4vbfl2pnd2dzm6a2tcss5",
-          //             "handle": "antitractionist.bsky.social",
-          //             "displayName": "Blue Eyes White Macron",
-          //             "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:zye4vbfl2pnd2dzm6a2tcss5/bafkreifhtegpddctgqezm6hy2yamnohwkcaw6xwvjeeifdyjn6z77omffy@jpeg",
-          //             "associated": {
-          //                 "activitySubscription": {
-          //                     "allowSubscriptions": "followers"
-          //                 }
-          //             },
-          //             "labels": [],
-          //             "createdAt": "2023-08-22T01:45:52.454Z"
-          //         },
-          //         "record": {
-          //             "$type": "app.bsky.feed.post",
-          //             "createdAt": "2025-11-16T19:36:02.414Z",
-          //             "langs": [
-          //                 "en"
-          //             ],
-          //             "reply": {
-          //                 "parent": {
-          //                     "cid": "bafyreiettido5ez4sip37dnrkpi7w4wdxdzqybjrshdzubjjn7ox2csv3q",
-          //                     "uri": "at://did:plc:ux34natbhxube3xgdu3rhf45/app.bsky.feed.post/3m5rhej42gk2j"
-          //                 },
-          //                 "root": {
-          //                     "cid": "bafyreiettido5ez4sip37dnrkpi7w4wdxdzqybjrshdzubjjn7ox2csv3q",
-          //                     "uri": "at://did:plc:ux34natbhxube3xgdu3rhf45/app.bsky.feed.post/3m5rhej42gk2j"
-          //                 }
-          //             },
-          //             "text": "Is it happening??"
-          //         },
-          //         "bookmarkCount": 0,
-          //         "replyCount": 0,
-          //         "repostCount": 0,
-          //         "likeCount": 0,
-          //         "quoteCount": 0,
-          //         "indexedAt": "2025-11-16T19:36:04.760Z",
-          //         "labels": []
-          //     },
-          //     "replies": [],
-          //     "threadContext": {}
-          // }
-          if (!uri) return;
-          const [_, __, repo, collection, rkey] = uri.split("/");
-          const { did, handle, displayName, avatar, labels: authorLabels, associated, createdAt: authorCreatedAt } = author || {}
-
-          const { $type: recordType, createdAt, langs, reply, embed, text } = record || {}
-          const { parent, root } = reply || {}
-          const { activitySubscription } = associated
-
-          let newTweet = {
-            id: cid,
-            uri,
-            timestamp: format(new Date(createdAt), {
-              // addSuffix: true,
-            }),
-            likeCount,
-            replyCount,
-            quoteCount,
-            repostCount,
-            bookmarkCount,
-            createdAt,
-            content: text,
-            userHandle: handle,
-            userName: displayName,
-            avatar: avatar,
-            postorder,
-            postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
-            profileUrl: `https://bsky.app/profile/${handle}`,
-            rkey,
-            langs,
-            author,
-            verifiers: {}
-          };
-          //get embeds async pull out?
-          if (embed) {
-            newTweet = await this.loadEmbedDetails(newTweet, embed, repo)
+          const { $type, post, replies, threadContext } = replyRecord || {}
+          const newTweet = await this.transformPost(post, postorder);
+          if (replies?.length) {
+            // const replyPosts = await Promise.all(replies.map((r, i) => this.transformPost(r.post, i)))
+            // newTweet.replies = replyPosts; //todo threaded
           }
-          return newTweet
-
+          return newTweet;
         },
         async loadEmbedDetails(newTweet, embed, repo) {
           if (embed.$type?.includes("embed.images")) {

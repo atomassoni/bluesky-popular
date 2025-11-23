@@ -628,7 +628,7 @@
 
                       <!-- Counters -->
                       <p class="mt-2 text-sm text-gray-600 flex justify-between items-center space-x-4">
-                        <span>Likes: <span x-text="tweet.likeCount"></span></span>
+                        <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
                         <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                         <span>Replies: <span x-text="tweet.replyCount"></span></span>
                         <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
@@ -735,14 +735,14 @@
 
                         <!-- Counters -->
                         <p class="mt-2 text-sm text-gray-600 flex justify-between items-center space-x-4">
-                          <span>Likes: <span x-text="tweet.likeCount"></span></span>
+                          <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
                           <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                           <span>Replies: <span x-text="tweet.replyCount"></span></span>
                           <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
                           <span>Reposts: <span x-text="tweet.repostCount"></span></span>
                         </p>
                         <!-- "view replies" button -->
-                        <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 text-sm rounded-md
+                        <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 mt-2 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600

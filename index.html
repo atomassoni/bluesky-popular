@@ -47,9 +47,10 @@
 </head>
 
 <body class="bg-white dark:bg-gray-900 min-h-screen flex items-center justify-center">
-  <div x-data="tweetFeed" id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
-    @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
-    <div x-on:click.away="resetTweets" x-show="showChart" id="chart"></div>
+  <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())" id="scroll-container"
+    class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200" @scroll.window.debounce.300ms="checkScroll"
+    class="min-h-screen">
+    <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
 
     <!-- Heading -->
     <div x-cloak x-show="tweets?.length" class="flex items-center justify-between">
@@ -57,7 +58,7 @@
         Popular posts
       </h1>
       <!-- Vertical dot menu -->
-      <div class="relative" x-data="{ open: false, selectedSort: 'default' }">
+      <div class="relative">
         <!-- Button to toggle menu -->
         <button @click="open = !open" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-800 dark:text-gray-200" fill="none"
@@ -74,9 +75,9 @@
             <li>
               <p @click="toggleSortOrder(); loadVisibleTweets(sortField); open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedSort === 'popularity' }">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.selectedSort === 'popularity' }">
                 Sort By Popularity
-                <svg x-show="selectedSort === 'popularity'" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="menu.selectedSort === 'popularity'" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -85,11 +86,11 @@
             </li>
 
             <li>
-              <p @click="selectedFilter == 'new' ? selectedFilter = null : selectedFilter = 'new'; tweets = filterPosts(allPosts); loadVisibleTweets(); open = false"
+              <p @click="menu.selectedFilter == 'new' ? menu.selectedFilter = null : menu.selectedFilter = 'new'; tweets = filterPosts(allPosts); loadVisibleTweets(); open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': selectedFilter === 'new' }">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.selectedFilter === 'new' }">
                 Show only new posts
-                <svg x-show="selectedFilter === 'new'" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="menu.selectedFilter === 'new'" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -103,11 +104,11 @@
               </p>
             </li>
             <li>
-              <p @click="showChart = !showChart; open = false"
+              <p @click="menu.showChart = !menu.showChart; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': showChart }">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showChart }">
                 Show likes graph
-                <svg x-show="showChart" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="menu.showChart" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -115,23 +116,40 @@
               </p>
             </li>
             <li>
-              <p @click="showAllLanguages = !showAllLanguages; open = false"
+              <p @click="menu.showAllLanguages = !menu.showAllLanguages; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': showAllLanguages}">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showAllLanguages}">
                 Show all languages
-                <svg x-show="showAllLanguages" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="menu.showAllLanguages" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
               </p>
             </li>
+            <template x-for="label in labels" :key="label">
+              <li>
+                <p @click="toggleLabel(label); open = false"
+                  class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  :class="{ 'bg-gray-100 dark:bg-gray-700': isLabelShown(label) }">
+                  <!-- x-text on a child to avoid wiping out the SVG -->
+                  <span x-text="'Show ' + label"></span>
+
+                  <svg x-show="isLabelShown(label)" xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </p>
+              </li>
+
+            </template>
             <li>
-              <p @click="showOnlyAuthorProfile = !showOnlyAuthorProfile; open = false"
+              <p @click="menu.showOnlyAuthorProfile = !menu.showOnlyAuthorProfile; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': showOnlyAuthorProfile}">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showOnlyAuthorProfile}">
                 Show author profile
-                <svg x-show="showOnlyAuthorProfile" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="menu.showOnlyAuthorProfile" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -139,11 +157,11 @@
               </p>
             </li>
             <li>
-              <p @click="noBigAccounts = !noBigAccounts; postThreshold = noBigAccounts? 5 : 10; open = false"
+              <p @click="menu.noBigAccounts = !menu.noBigAccounts; postThreshold = menu.noBigAccounts? 5 : 10; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': noBigAccounts}">
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.noBigAccounts}">
                 Ignore large accounts
-                <svg x-show="noBigAccounts" xmlns="http://www.w3.org/2000/svg"
+                <svg x-show="menu.noBigAccounts" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -172,7 +190,7 @@
               <!-- Profile Card Component -->
               <div class="w-full max-w-2xl mx-auto">
                 <!-- Profile -->
-                <article x-show="showOnlyAuthorProfile && tweet.author" x-cloak
+                <article x-show="menu.showOnlyAuthorProfile && tweet.author" x-cloak
                   class="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:bg-neutral-900 dark:border-neutral-800">
                   <!-- Header -->
                   <!-- Profile card (optional wrapper) -->
@@ -349,7 +367,7 @@
 
               <!-- Main Tweet -->
 
-              <div x-show="!showOnlyAuthorProfile" x-cloak class="flex justify-between items-start mb-2">
+              <div x-show="!menu.showOnlyAuthorProfile" x-cloak class="flex justify-between items-start mb-2">
                 <!-- Left section (avatar, username, handle) -->
                 <div class="flex items-center">
                   <!-- Avatar -->
@@ -386,7 +404,7 @@
                 <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
               </div>
 
-              <p x-show="showOnlyAuthorProfile" class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+              <p x-show="menu.showOnlyAuthorProfile" class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
 
               <!-- Tweet Content (Full Width) -->
               <a :href="tweet.postUrl" target="_blank"
@@ -799,6 +817,7 @@
         observer: null,
         likeTracker: {},
         labelTracker: {},
+        labels: [],
         trackedLength: 0,
         counter: 0,
         postorder: 0,
@@ -809,25 +828,50 @@
         numSeconds: 60,
         numToTrack: 25,
         calculating: false,
-        sortField: 'postorder',
-        selectedFilter: null,
-        selectedSort: 'default',
+        // sortField: 'postorder',
+        // selectedFilter: null,
+        // selectedSort: 'default',
         collections: {},
-        showChart: false,
-        showAllLanguages: false,
-        showOnlyAuthorProfile: false,
+        // showChart: false,
+        // showAllLanguages: false,
+        // showOnlyAuthorProfile: false,
         postThreshold: 10,
-        noBigAccounts: false,
+        // noBigAccounts: false,
         loadingReplies: false,
         loadingMoreReplies: false,
         showModalReplies: false,
         replies: [], // will be set only when modal for one post is open
         rawReplies: [],
         activeReply: "",
+        open: false,
+        menu: {
+          sortField: "postorder",
+          selectedSort: "default", //"popularity"
+          selectedFilter: null, //"new"
+          showChart: false,
+          showAllLanguages: false,
+          showLabeled: false,
+          showOnlyAuthorProfile: false,
+          noBigAccounts: false
+        },
         async init() {
+          this.loadMenu()
           this.addVisibilityListeners();
           this.startWebsocket();
           this.chartIt()
+
+        },
+        loadMenu() {
+          const menuString = localStorage.getItem("menu");
+          if(!menuString) return 
+          console.log({ menuString })
+          this.menu = JSON.parse(menuString);
+          this.labels = Object.keys(this.menu).filter(menuItem=>menuItem.startsWith("show_")).map(key=>key.split("show_")[1])
+        },
+        saveMenu() {
+          const menuString = JSON.stringify(this.menu)
+          console.log({ menuString })
+          localStorage.setItem("menu", menuString)
 
         },
         videoIntersectionObserver(elements) {
@@ -977,12 +1021,12 @@
           const col = db.posts.toCollection().modify(post => post.viewCount = 0)
         },
         filterPosts(tweets) {
-          return tweets.filter(p => this.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p).filter(p => this.showAllLanguages ? p : p.langs?.includes('en'))
+          return tweets.filter(p => this.menu.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p).filter(p => this.menu.showAllLanguages ? p : p.langs?.includes('en'))
         }
         ,
         toggleSortOrder() {
-          this.selectedSort == 'default' ? this.selectedSort = 'popularity' : this.selectedSort = 'default';
-          this.sortField = this.selectedSort == 'popularity' ? 'likesPerSecond' : 'postorder';
+          this.menu.selectedSort == 'default' ? this.menu.selectedSort = 'popularity' : this.menu.selectedSort = 'default';
+          this.menu.sortField = this.menu.selectedSort == 'popularity' ? 'likesPerSecond' : 'postorder';
         },
         async checkScroll() {
           const scrollPosition = window.innerHeight + window.scrollY;
@@ -997,9 +1041,8 @@
         async loadMore() {
           console.log("load", this.numToTrack);
           this.numToTrack += 5;
-          await this.loadVisibleTweets(this.sortField);
+          await this.loadVisibleTweets(this.menu.sortField);
         },
-
         chartIt() {
           var options = {
             series: [],
@@ -1077,7 +1120,21 @@
         },
         resetTweets() {
           this.showOnlyUri = undefined;
-          this.loadVisibleTweets(this.sortField);
+          this.loadVisibleTweets(this.menu.sortField);
+        },
+        isLabelShown(label) {
+          const key = 'show_' + label;
+          if (!(key in this.menu)) {
+            // default behaviour: shown (or false if you prefer)
+            this.menu[key] = false;
+          }
+          console.log('key', key, `this.menu[key]`, this.menu[key])
+          return this.menu[key];
+        },
+        // 🔹 Toggle a label’s visibility
+        toggleLabel(label) {
+          const key = 'show_' + label;
+          this.menu[key] = !this.isLabelShown(label);
         },
         startWebsocket(q) {
           const queryString = window.location.search;
@@ -1213,7 +1270,7 @@
               this.trackedLength = tweets.length;
 
               if (!this.showOnlyUri) {
-                this.loadVisibleTweets(this.sortField);
+                this.loadVisibleTweets(this.menu.sortField);
               } else {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
               }
@@ -1253,7 +1310,7 @@
                 }
                 const ratio = authorSave.followersCount / totalLikeCount
                 console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
-                if (this.noBigAccounts && ratio > 25) return;
+                if (this.menu.noBigAccounts && ratio > 25) return;
 
                 let verifiersSave = []
                 for (const verification of authorSave.verification?.verifications || []) {
@@ -1273,12 +1330,12 @@
                     ///this will count every like 
                     if (!this.labelTracker[val]) {
                       this.labelTracker[val] = 0;
+                      this.labels.push(val)
                     }
                     this.labelTracker[val]++;
-
                   }
-                  console.log("labels", Object.keys(this.labelTracker))
-                  return;
+                  const showPost = labels.every(label => this.isLabelShown(label.val));
+                  if (!showPost) return
                 }
                 const newTweet = await this.transformPost(postSave, this.postorder, authorSave, verifiersSave)
                 this.postorder++;
@@ -1420,6 +1477,7 @@
               "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
             ];
           } else if (embed.$type?.includes("embed.record")) {
+            console.log("embed record", embed)
             const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
             console.log({ quotedPost })
             newTweet.quotePost = quotedPost

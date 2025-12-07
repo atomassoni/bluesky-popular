@@ -1510,9 +1510,11 @@
             ];
           } else if (embed.$type?.includes("embed.record")) {
             console.log("embed record", embed)
-            const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
-            console.log({ quotedPost })
-            newTweet.quotePost = quotedPost
+            if (embed.record.uri) {
+              const quotedPost = (await this.getPosts(embed.record.uri))?.posts[0]
+              console.log({ quotedPost })
+              newTweet.quotePost = quotedPost
+            }
           } else {
             console.log({ embed });
 

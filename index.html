@@ -501,6 +501,15 @@
            transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
                   View thread
                 </button>
+                <!-- "view quotes" button -->
+                <button class="px-3 py-1.5 mt-2 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
+                  View quotes
+                </button>
               </div>
             </div>
 
@@ -863,10 +872,10 @@
         },
         loadMenu() {
           const menuString = localStorage.getItem("menu");
-          if(!menuString) return 
+          if (!menuString) return
           console.log({ menuString })
           this.menu = JSON.parse(menuString);
-          this.labels = Object.keys(this.menu).filter(menuItem=>menuItem.startsWith("show_")).map(key=>key.split("show_")[1])
+          this.labels = Object.keys(this.menu).filter(menuItem => menuItem.startsWith("show_")).map(key => key.split("show_")[1])
         },
         saveMenu() {
           const menuString = JSON.stringify(this.menu)
@@ -931,6 +940,29 @@
           while (parent) {
             this.rawReplies.unshift(parent);
             parent = parent.parent;//uh ok
+          }
+        },
+        async loadQuotes(uri) {
+          // this.activeReply = uri;
+          this.loadingReplies = true;
+          try {
+            this.rawReplies = []
+            this.replies = [];
+            const quotes = await this.getQuotes(uri);
+            console.log({ quotes });
+
+            //hacky: conform to replies format
+            const replies = quotes.posts.map(p => ({ post: p })) ?? []
+            // this.rawReplies.push(res.thread)
+            // // transformReplyRecordToPost()
+            console.log("replies 0", replies[0]);
+            this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
+            await this.loadMoreReplies();
+          } catch (e) {
+            console.error(e);
+            this.replies = [];
+          } finally {
+            this.loadingReplies = false;
           }
         },
         async loadReplyThread(uri) {
@@ -1517,6 +1549,12 @@
         async getPostThread(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
           const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${queryParams}`;
+          const posts = await fetchFrom(url);
+          return posts;
+        },
+        async getQuotes(uri) {
+          const queryParams = new URLSearchParams({ uri }).toString();
+          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getQuotes?${queryParams}`;
           const posts = await fetchFrom(url);
           return posts;
         },

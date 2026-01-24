@@ -115,6 +115,18 @@
                 </svg>
               </p>
             </li>
+                        <li>
+              <p @click="menu.autoPlayVideo = !menu.autoPlayVideo; open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.autoPlayVideo}">
+                Autoplay Video
+                <svg x-show="menu.autoPlayVideo" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
             <li>
               <p @click="menu.showAllLanguages = !menu.showAllLanguages; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -861,7 +873,8 @@
           showAllLanguages: false,
           showLabeled: false,
           showOnlyAuthorProfile: false,
-          noBigAccounts: false
+          noBigAccounts: false,
+          autoPlayVideo: false
         },
         async init() {
           this.loadMenu()
@@ -886,7 +899,8 @@
         videoIntersectionObserver(elements) {
           const observer = new IntersectionObserver((entries, _observer) => {
             entries.forEach((entry) => {
-              if (entry.isIntersecting) {
+              
+              if (entry.isIntersecting && this.menu.autoPlayVideo) {
                 entry.target.play();
               } else {
                 entry.target.pause();
@@ -1322,6 +1336,8 @@
                 }
                 if (!postSave) {
                   postSave = (await this.getPosts(uri))?.posts[0];
+                                  console.log(postSave?.record?.text)
+
                   // const postThread = await this.getPostThread(uri)
                   // console.log({ postThread })
                   console.log({ postSave }, likeCid, postSave.cid)

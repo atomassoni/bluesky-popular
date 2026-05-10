@@ -499,7 +499,7 @@
                       </template>
                     </div>
                     <!-- Video -->
-                    <div class="mt-2" x-show="likeTracker[tweet.quotePost.uri].video">
+                    <div class="mt-2" x-show="tweet.quotePost.video">
                       <video :src="tweet.quotePost.video" controls loop muted
                         class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
                         Your browser does not support the video tag.
@@ -1036,23 +1036,30 @@
           console.log({ elements })
           elements.forEach(el => this.observer.observe(el))
         },
+        async loadTrackedVideo(target, uri, label) {
+          const { video, videoLink, videoLoading } = target
+          if (!videoLink || video || videoLoading) return
+
+          const [_, __, repo] = uri.split("/")
+
+          try {
+            target.videoLoading = true
+            const videoBlob = await this.loadBlob('videos', videoLink, repo)
+            target.video = URL.createObjectURL(videoBlob)
+            target.images = []
+            console.log(`loaded ${label}`, target)
+          } catch (err) {
+            console.error(err)
+          } finally {
+            target.videoLoading = false
+          }
+        },
         async loadVideoInLikeTracker(uri) {
           const post = this.likeTracker[uri];
-          const { video, videoLink, videoLoading } = post
-          if (videoLink && !video && !videoLoading) {
-            console.log("loading video", videoLink);
-            const [_, __, repo, collection, rkey] = uri.split("/");
-            try {
-              this.likeTracker[uri].videoLoading = true;
-              const videoBlob = await this.loadBlob('videos', videoLink, repo)
-              const video = URL.createObjectURL(videoBlob)
-              this.likeTracker[uri].video = video;
-              this.likeTracker[uri].images = [];
-              this.likeTracker[uri].videoLoading = false;
-              console.log("loaded video", this.likeTracker[uri])
-            } catch (err) {
-              console.error(err)
-            }
+          await this.loadTrackedVideo(post, uri, 'video')
+
+          if (post.quotePost) {
+            await this.loadTrackedVideo(post.quotePost, post.quotePost.uri, 'quote video')
           }
         },
         numRepliesToLoad: 10,
@@ -1156,9 +1163,6 @@
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri, quotePost } = newTweets[index];
             await this.loadVideoInLikeTracker(uri);
-            if (quotePost) {
-              await this.loadVideoInLikeTracker(quotePost.uri)
-            }
             const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
             if (currentTweetIndex)
               newTweets[index] = this.likeTracker[uri]

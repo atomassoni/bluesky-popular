@@ -478,10 +478,9 @@
 
               <!-- Quote Tweet -->
               <template x-if="tweet.quotePost">
-                <div
-                  class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2">
-                  <div class="flex items-center"> <!-- Quote Tweet Avatar -->
-                    <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2">
+                  <div class="flex items-center"> <!-- Quote Tweet Avatar --> 
+                    <img :src="tweet.quotePost.author.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 fill=%22%23e5e7eb%22/%3E%3Ccircle cx=%2225%22 cy=%2219%22 r=%229%22 fill=%22%239ca3af%22/%3E%3Cpath d=%22M9 45c2.5-8 9-12 16-12s13.5 4 16 12%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%226%22 stroke-linecap=%22round%22/%3E%3C/svg%3E'" alt="Reply Avatar"
                       class="w-6 h-6 rounded-full mr-3" />
 
                     <div class="flex-1 min-w-0">
@@ -493,451 +492,449 @@
                     </div>
                   </div>
                   <div class="mt-1">
-                      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
-                        x-text="tweet.quotePost.content || 'Post not available'"></p>
-                      <div class="mt-2 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
-                        <template x-for="image in tweet.quotePost.images" :key="image">
-                          <img :src="image" alt="Tweet Image"
-                            class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
-                        </template>
-                      </div>
-                      <!-- Video -->
-                      <div class="mt-2" x-show="tweet.quotePost.video">
-                        <video :src="tweet.quotePost.video" controls loop muted
-                          class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-                      <!-- Embeds -->
-                      <template x-if="tweet.quotePost.external">
-                        <div class="mt-4">
-                          <div
-                            class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
-                            <!-- Thumbnail -->
-                            <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
-                              <img x-show="tweet.quotePost.external.imageSrc"
-                                :src="tweet.quotePost.external.gifSrc ? tweet.quotePost.external.gifSrc : tweet.quotePost.external.imageSrc"
-                                :alt="tweet.quotePost.external.alt" class="w-full object-contain" />
-                            </a>
-                            <!-- Content -->
-                            <div class="p-4" x-show="tweet.quotePost.external.title">
-                              <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
-                                <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
-                                  x-text="tweet.quotePost.external.title"></h3>
-                                <p class="text-gray-600 dark:text-gray-300 mt-2"
-                                  x-text="tweet.quotePost.external.description"></p>
-                              </a>
-                              <a :href="tweet.quotePost.external.uri" target="_blank"
-                                class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
-                                <!-- SVG Icon -->
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
-                                  class="inline align-middle w-4 h-4">
-                                  <path
-                                    d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
-                                </svg>
-                                <!-- Hostname Text -->
-                                <span x-text="tweet.quotePost.external.hostname" class="align-middle"></span>
-                              </a>
-                            </div>
-                          </div>
-                        </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                      x-text="tweet.quotePost.content || 'Post not available'"></p>
+                    <div class="mt-2 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
+                      <template x-for="image in tweet.quotePost.images" :key="image">
+                        <img :src="image" alt="Tweet Image"
+                          class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                       </template>
                     </div>
+                    <!-- Video -->
+                    <div class="mt-2" x-show="tweet.quotePost.video">
+                      <video :src="tweet.quotePost.video" controls loop muted
+                        class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                    <!-- Embeds -->
+                    <template x-if="tweet.quotePost.external">
+                      <div class="mt-4">
+                        <div
+                          class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
+                          <!-- Thumbnail -->
+                          <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
+                            <img x-show="tweet.quotePost.external.imageSrc"
+                              :src="tweet.quotePost.external.gifSrc ? tweet.quotePost.external.gifSrc : tweet.quotePost.external.imageSrc"
+                              :alt="tweet.quotePost.external.alt" class="w-full object-contain" />
+                          </a>
+                          <!-- Content -->
+                          <div class="p-4" x-show="tweet.quotePost.external.title">
+                            <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
+                              <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
+                                x-text="tweet.quotePost.external.title"></h3>
+                              <p class="text-gray-600 dark:text-gray-300 mt-2"
+                                x-text="tweet.quotePost.external.description"></p>
+                            </a>
+                            <a :href="tweet.quotePost.external.uri" target="_blank"
+                              class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
+                              <!-- SVG Icon -->
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
+                                class="inline align-middle w-4 h-4">
+                                <path
+                                  d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
+                              </svg>
+                              <!-- Hostname Text -->
+                              <span x-text="tweet.quotePost.external.hostname" class="align-middle"></span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
                   </div>
                 </div>
-              </template>
-              <!-- other counters -->
-              <p class="text-sm mt-2 text-gray-600 flex justify-between items-center space-x-4">
-                <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
-                <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
-                <span>Replies: <span x-text="tweet.replyCount"></span></span>
-                <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
-                <span>Reposts: <span x-text="tweet.repostCount"></span></span>
-              </p>
-              <!-- Like counter -->
-              <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
-              </p>
+            </div>
+        </template>
+        <!-- other counters -->
+        <p class="text-sm mt-2 text-gray-600 flex justify-between items-center space-x-4">
+          <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
+          <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
+          <span>Replies: <span x-text="tweet.replyCount"></span></span>
+          <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
+          <span>Reposts: <span x-text="tweet.repostCount"></span></span>
+        </p>
+        <!-- Like counter -->
+        <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
+        </p>
 
-              <!-- view replies div -->
-              <div>
-                <!-- "view replies" button -->
-                <button class="px-3 py-1.5 mt-2 text-sm rounded-md
+        <!-- view replies div -->
+        <div>
+          <!-- "view replies" button -->
+          <button class="px-3 py-1.5 mt-2 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
-                  View thread
-                </button>
-                <!-- "view quotes" button -->
-                <button class="px-3 py-1.5 mt-2 text-sm rounded-md
+            View thread
+          </button>
+          <!-- "view quotes" button -->
+          <button class="px-3 py-1.5 mt-2 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
-                  View quotes
-                </button>
-              </div>
-            </div>
+            View quotes
+          </button>
+        </div>
+      </div>
 
-          </div>
-        </template>
-        <!-- Modal overlay -->
-        <div x-show="showModalReplies" x-cloak
-          class="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
-          <!-- Modal box -->
-          <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+    </div>
+    </template>
+    <!-- Modal overlay -->
+    <div x-show="showModalReplies" x-cloak
+      class="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+      <!-- Modal box -->
+      <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
              rounded-xl shadow-2xl w-full max-w-lg p-5 border border-gray-200 dark:border-gray-700">
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-lg font-semibold">
-                Thread
-                <span x-text="`${replies.length} / ${rawReplies.length}`"></span>
-              </h2>
-              <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                @click="showModalReplies = false">
-                &times;
-              </button>
-            </div>
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">
+            Thread
+            <span x-text="`${replies.length} / ${rawReplies.length}`"></span>
+          </h2>
+          <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            @click="showModalReplies = false">
+            &times;
+          </button>
+        </div>
 
-            <!-- Loading state -->
-            <div x-show="loadingReplies" class="text-sm text-gray-500 dark:text-gray-400">
-              Loading replies…
-            </div>
-            <!-- Replies -->
-            <ul x-show="!loadingReplies"
-              class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
-              @scroll="maybeLoadMore($el)">
-              <template x-for="tweet in replies" :key="tweet.id">
-                <li class="py-2">
-                  <template x-if="tweet.uri === activeReply">
-                    <div>
-                      <div class="flex justify-between items-start mb-1.5">
-                        <div class="flex items-center">
-                          <a :href="tweet.profileUrl" target="_blank" class="mr-4 flex-shrink-0">
-                            <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
-                              class="w-6 h-6 rounded-full" />
-                          </a>
-
-                          <div class="flex flex-col justify-center">
-                            <div class="flex items-center gap-1">
-                              <a :href="tweet.profileUrl" target="_blank"
-                                class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
-                                x-text="tweet.userName"></a>
-                              <template
-                                x-if="(tweet.author?.verifications || []).some(v => v?.isValid) || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
-                                <svg xmlns="http://www.w3.org/2000/svg"
-                                  class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
-                                  fill="currentColor" aria-label="Verified account" role="img">
-                                  <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                              </template>
-                            </div>
-
-                            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></p>
-                          </div>
-                        </div>
-
-                        <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
-                      </div>
-
-                      <a :href="tweet.postUrl" target="_blank"
-                        class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
-                        x-text="tweet.content"></a>
-
-                      <div class="mt-1.5" x-show="tweet.images?.length > 0">
-                        <template x-for="image in tweet.images" :key="image">
-                          <a :href="tweet.postUrl" target="_blank" class="block mt-2">
-                            <img :src="image" alt="Tweet Image"
-                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
-                          </a>
-                        </template>
-                      </div>
-
-                      <div class="mt-1.5" x-show="tweet.video">
-                        <video :src="tweet.video" controls loop muted
-                          class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-
-                      <template x-if="tweet.external">
-                        <div class="mt-3">
-                          <div
-                            class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
-                            <a :href="tweet.external.uri" target="_blank" class="block">
-                              <img x-show="tweet.external.imageSrc"
-                                :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
-                                :alt="tweet.external.alt" class="w-full object-contain" />
-                            </a>
-                            <div class="p-4" x-show="tweet.external.title">
-                              <a :href="tweet.external.uri" target="_blank" class="block">
-                                <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
-                                  x-text="tweet.external.title"></h3>
-                                <p class="text-gray-600 dark:text-gray-300 mt-2" x-text="tweet.external.description">
-                                </p>
-                              </a>
-                              <a :href="tweet.external.uri" target="_blank"
-                                class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
-                                  class="inline align-middle w-4 h-4">
-                                  <path
-                                    d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
-                                </svg>
-                                <span x-text="tweet.external.hostname" class="align-middle"></span>
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                      </template>
-
-                      <template x-if="tweet.quotePost">
-                        <div
-                          class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
-                          <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'"
-                            alt="Reply Avatar" class="w-6 h-6 rounded-full mr-3" />
-                          <div class="flex-1">
-                            <p class="font-semibold text-gray-600 dark:text-gray-300">
-                              <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
-                              <span class="text-sm text-gray-500 dark:text-gray-400"
-                                x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
-                            </p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
-                              x-text="tweet.quotePost.content || 'Post not available'"></p>
-                            <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
-                              <template x-for="image in tweet.quotePost.images" :key="image">
-                                <img :src="image" alt="Tweet Image"
-                                  class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
-                              </template>
-                            </div>
-                            <div class="mt-1.5" x-show="tweet.quotePost.video">
-                              <video :src="tweet.quotePost.video" controls loop muted
-                                class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
-                                Your browser does not support the video tag.
-                              </video>
-                            </div>
-                            <template x-if="tweet.quotePost.external">
-                              <div class="mt-3">
-                                <div
-                                  class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
-                                  <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
-                                    <img x-show="tweet.quotePost.external.imageSrc"
-                                      :src="tweet.quotePost.external.gifSrc ? tweet.quotePost.external.gifSrc : tweet.quotePost.external.imageSrc"
-                                      :alt="tweet.quotePost.external.alt" class="w-full object-contain" />
-                                  </a>
-                                  <div class="p-4" x-show="tweet.quotePost.external.title">
-                                    <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
-                                      <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
-                                        x-text="tweet.quotePost.external.title"></h3>
-                                      <p class="text-gray-600 dark:text-gray-300 mt-2"
-                                        x-text="tweet.quotePost.external.description"></p>
-                                    </a>
-                                    <a :href="tweet.quotePost.external.uri" target="_blank"
-                                      class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
-                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
-                                        class="inline align-middle w-4 h-4">
-                                        <path
-                                          d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
-                                      </svg>
-                                      <span x-text="tweet.quotePost.external.hostname" class="align-middle"></span>
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-                            </template>
-                          </div>
-                        </div>
-                      </template>
-
-                      <p class="text-sm mt-1.5 text-gray-600 flex justify-between items-center space-x-4">
-                        <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
-                        <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
-                        <span>Replies: <span x-text="tweet.replyCount"></span></span>
-                        <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
-                        <span>Reposts: <span x-text="tweet.repostCount"></span></span>
-                      </p>
-                    </div>
-                  </template>
-
-                  <template x-if="tweet.uri !== activeReply">
-                    <div class="mt-1 flex items-start px-2 py-1.5">
-                      <a :href="tweet.profileUrl" target="_blank" class="mr-3">
+        <!-- Loading state -->
+        <div x-show="loadingReplies" class="text-sm text-gray-500 dark:text-gray-400">
+          Loading replies…
+        </div>
+        <!-- Replies -->
+        <ul x-show="!loadingReplies" class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
+          @scroll="maybeLoadMore($el)">
+          <template x-for="tweet in replies" :key="tweet.id">
+            <li class="py-2">
+              <template x-if="tweet.uri === activeReply">
+                <div>
+                  <div class="flex justify-between items-start mb-1.5">
+                    <div class="flex items-center">
+                      <a :href="tweet.profileUrl" target="_blank" class="mr-4 flex-shrink-0">
                         <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
                           class="w-6 h-6 rounded-full" />
                       </a>
 
-                      <div class="flex-1">
-                        <p class="font-semibold text-gray-600 dark:text-gray-300">
-                          <span>
-                            <a :href="tweet.profileUrl" target="_blank"
-                              class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
-                              x-text="tweet.userName"></a>
-                          </span>
-                          <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></span>
-                        </p>
-                        <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
-
-                        <a :href="tweet.postUrl" target="_blank"
-                          class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
-                          x-text="tweet.content"></a>
-
-                        <div class="mt-1.5" x-show="tweet.images?.length > 0">
-                          <template x-for="image in tweet.images" :key="image">
-                            <a :href="tweet.postUrl" target="_blank" class="block mt-2">
-                              <img :src="image" alt="Tweet Image"
-                                class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
-                            </a>
+                      <div class="flex flex-col justify-center">
+                        <div class="flex items-center gap-1">
+                          <a :href="tweet.profileUrl" target="_blank"
+                            class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                            x-text="tweet.userName"></a>
+                          <template
+                            x-if="(tweet.author?.verifications || []).some(v => v?.isValid) || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                              class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
+                              fill="currentColor" aria-label="Verified account" role="img">
+                              <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            </svg>
                           </template>
                         </div>
 
-                        <div class="mt-1.5" x-show="tweet.video">
-                          <video :src="tweet.video" controls loop muted
-                            class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></p>
+                      </div>
+                    </div>
+
+                    <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+                  </div>
+
+                  <a :href="tweet.postUrl" target="_blank"
+                    class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
+                    x-text="tweet.content"></a>
+
+                  <div class="mt-1.5" x-show="tweet.images?.length > 0">
+                    <template x-for="image in tweet.images" :key="image">
+                      <a :href="tweet.postUrl" target="_blank" class="block mt-2">
+                        <img :src="image" alt="Tweet Image"
+                          class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                      </a>
+                    </template>
+                  </div>
+
+                  <div class="mt-1.5" x-show="tweet.video">
+                    <video :src="tweet.video" controls loop muted
+                      class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+
+                  <template x-if="tweet.external">
+                    <div class="mt-3">
+                      <div
+                        class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
+                        <a :href="tweet.external.uri" target="_blank" class="block">
+                          <img x-show="tweet.external.imageSrc"
+                            :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
+                            :alt="tweet.external.alt" class="w-full object-contain" />
+                        </a>
+                        <div class="p-4" x-show="tweet.external.title">
+                          <a :href="tweet.external.uri" target="_blank" class="block">
+                            <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
+                              x-text="tweet.external.title"></h3>
+                            <p class="text-gray-600 dark:text-gray-300 mt-2" x-text="tweet.external.description">
+                            </p>
+                          </a>
+                          <a :href="tweet.external.uri" target="_blank"
+                            class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
+                              class="inline align-middle w-4 h-4">
+                              <path
+                                d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
+                            </svg>
+                            <span x-text="tweet.external.hostname" class="align-middle"></span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="tweet.quotePost">
+                    <div
+                      class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
+                      <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                        class="w-6 h-6 rounded-full mr-3" />
+                      <div class="flex-1">
+                        <p class="font-semibold text-gray-600 dark:text-gray-300">
+                          <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                          <span class="text-sm text-gray-500 dark:text-gray-400"
+                            x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                          x-text="tweet.quotePost.content || 'Post not available'"></p>
+                        <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
+                          <template x-for="image in tweet.quotePost.images" :key="image">
+                            <img :src="image" alt="Tweet Image"
+                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                          </template>
+                        </div>
+                        <div class="mt-1.5" x-show="tweet.quotePost.video">
+                          <video :src="tweet.quotePost.video" controls loop muted
+                            class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
                             Your browser does not support the video tag.
                           </video>
                         </div>
-
-                        <template x-if="tweet.external">
+                        <template x-if="tweet.quotePost.external">
                           <div class="mt-3">
-                            <div class="border border-gray-300 dark:border-gray-700 overflow-hidden">
-                              <a :href="tweet.external.uri" target="_blank" class="block">
-                                <img x-show="tweet.external.imageSrc"
-                                  :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
-                                  :alt="tweet.external.alt" class="w-full object-contain" />
+                            <div
+                              class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
+                              <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
+                                <img x-show="tweet.quotePost.external.imageSrc"
+                                  :src="tweet.quotePost.external.gifSrc ? tweet.quotePost.external.gifSrc : tweet.quotePost.external.imageSrc"
+                                  :alt="tweet.quotePost.external.alt" class="w-full object-contain" />
                               </a>
-                              <div class="p-4" x-show="tweet.external.title">
-                                <a :href="tweet.external.uri" target="_blank" class="block">
+                              <div class="p-4" x-show="tweet.quotePost.external.title">
+                                <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
                                   <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
-                                    x-text="tweet.external.title"></h3>
-                                  <p class="text-gray-600 dark:text-gray-300 mt-2" x-text="tweet.external.description">
-                                  </p>
+                                    x-text="tweet.quotePost.external.title"></h3>
+                                  <p class="text-gray-600 dark:text-gray-300 mt-2"
+                                    x-text="tweet.quotePost.external.description"></p>
                                 </a>
-                                <a :href="tweet.external.uri" target="_blank"
+                                <a :href="tweet.quotePost.external.uri" target="_blank"
                                   class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
                                     class="inline align-middle w-4 h-4">
                                     <path
                                       d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
                                   </svg>
-                                  <span x-text="tweet.external.hostname" class="align-middle"></span>
+                                  <span x-text="tweet.quotePost.external.hostname" class="align-middle"></span>
                                 </a>
                               </div>
                             </div>
                           </div>
                         </template>
+                      </div>
+                    </div>
+                  </template>
 
-                        <template x-if="tweet.quotePost">
-                          <div
-                            class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
-                            <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'"
-                              alt="Reply Avatar" class="w-6 h-6 rounded-full mr-3" />
-                            <div class="flex-1">
-                              <p class="font-semibold text-gray-600 dark:text-gray-300">
-                                <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400"
-                                  x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
+                  <p class="text-sm mt-1.5 text-gray-600 flex justify-between items-center space-x-4">
+                    <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
+                    <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
+                    <span>Replies: <span x-text="tweet.replyCount"></span></span>
+                    <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
+                    <span>Reposts: <span x-text="tweet.repostCount"></span></span>
+                  </p>
+                </div>
+              </template>
+
+              <template x-if="tweet.uri !== activeReply">
+                <div class="mt-1 flex items-start px-2 py-1.5">
+                  <a :href="tweet.profileUrl" target="_blank" class="mr-3">
+                    <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
+                      class="w-6 h-6 rounded-full" />
+                  </a>
+
+                  <div class="flex-1">
+                    <p class="font-semibold text-gray-600 dark:text-gray-300">
+                      <span>
+                        <a :href="tweet.profileUrl" target="_blank"
+                          class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                          x-text="tweet.userName"></a>
+                      </span>
+                      <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></span>
+                    </p>
+                    <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+
+                    <a :href="tweet.postUrl" target="_blank"
+                      class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
+                      x-text="tweet.content"></a>
+
+                    <div class="mt-1.5" x-show="tweet.images?.length > 0">
+                      <template x-for="image in tweet.images" :key="image">
+                        <a :href="tweet.postUrl" target="_blank" class="block mt-2">
+                          <img :src="image" alt="Tweet Image"
+                            class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                        </a>
+                      </template>
+                    </div>
+
+                    <div class="mt-1.5" x-show="tweet.video">
+                      <video :src="tweet.video" controls loop muted
+                        class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+
+                    <template x-if="tweet.external">
+                      <div class="mt-3">
+                        <div class="border border-gray-300 dark:border-gray-700 overflow-hidden">
+                          <a :href="tweet.external.uri" target="_blank" class="block">
+                            <img x-show="tweet.external.imageSrc"
+                              :src="tweet.external.gifSrc ? tweet.external.gifSrc : tweet.external.imageSrc"
+                              :alt="tweet.external.alt" class="w-full object-contain" />
+                          </a>
+                          <div class="p-4" x-show="tweet.external.title">
+                            <a :href="tweet.external.uri" target="_blank" class="block">
+                              <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
+                                x-text="tweet.external.title"></h3>
+                              <p class="text-gray-600 dark:text-gray-300 mt-2" x-text="tweet.external.description">
                               </p>
-                              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
-                                x-text="tweet.quotePost.content || 'Post not available'"></p>
-                              <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
-                                <template x-for="image in tweet.quotePost.images" :key="image">
-                                  <img :src="image" alt="Tweet Image"
-                                    class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
-                                </template>
-                              </div>
-                              <div class="mt-1.5" x-show="tweet.quotePost.video">
-                                <video :src="tweet.quotePost.video" controls loop muted
-                                  class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
-                                  Your browser does not support the video tag.
-                                </video>
-                              </div>
-                              <template x-if="tweet.quotePost.external">
-                                <div class="mt-3">
-                                  <div
-                                    class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
-                                    <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
-                                      <img x-show="tweet.quotePost.external.imageSrc"
-                                        :src="tweet.quotePost.external.gifSrc ? tweet.quotePost.external.gifSrc : tweet.quotePost.external.imageSrc"
-                                        :alt="tweet.quotePost.external.alt" class="w-full object-contain" />
-                                    </a>
-                                    <div class="p-4" x-show="tweet.quotePost.external.title">
-                                      <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
-                                        <h3
-                                          class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
-                                          x-text="tweet.quotePost.external.title"></h3>
-                                        <p class="text-gray-600 dark:text-gray-300 mt-2"
-                                          x-text="tweet.quotePost.external.description"></p>
-                                      </a>
-                                      <a :href="tweet.quotePost.external.uri" target="_blank"
-                                        class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
-                                          class="inline align-middle w-4 h-4">
-                                          <path
-                                            d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
-                                        </svg>
-                                        <span x-text="tweet.quotePost.external.hostname" class="align-middle"></span>
-                                      </a>
-                                    </div>
-                                  </div>
-                                </div>
-                              </template>
-                            </div>
+                            </a>
+                            <a :href="tweet.external.uri" target="_blank"
+                              class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
+                                class="inline align-middle w-4 h-4">
+                                <path
+                                  d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
+                              </svg>
+                              <span x-text="tweet.external.hostname" class="align-middle"></span>
+                            </a>
                           </div>
-                        </template>
+                        </div>
+                      </div>
+                    </template>
 
-                        <p class="mt-1.5 text-sm text-gray-600 flex justify-between items-center space-x-4">
-                          <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
-                          <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
-                          <span>Replies: <span x-text="tweet.replyCount"></span></span>
-                          <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
-                          <span>Reposts: <span x-text="tweet.repostCount"></span></span>
-                        </p>
-                        <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+                    <template x-if="tweet.quotePost">
+                      <div
+                        class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
+                        <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                          class="w-6 h-6 rounded-full mr-3" />
+                        <div class="flex-1">
+                          <p class="font-semibold text-gray-600 dark:text-gray-300">
+                            <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400"
+                              x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
+                          </p>
+                          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+                            x-text="tweet.quotePost.content || 'Post not available'"></p>
+                          <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
+                            <template x-for="image in tweet.quotePost.images" :key="image">
+                              <img :src="image" alt="Tweet Image"
+                                class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
+                            </template>
+                          </div>
+                          <div class="mt-1.5" x-show="tweet.quotePost.video">
+                            <video :src="tweet.quotePost.video" controls loop muted
+                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                              Your browser does not support the video tag.
+                            </video>
+                          </div>
+                          <template x-if="tweet.quotePost.external">
+                            <div class="mt-3">
+                              <div
+                                class="border border-gray-300 dark:border-gray-700 rounded-lg shadow-md overflow-hidden mt-4">
+                                <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
+                                  <img x-show="tweet.quotePost.external.imageSrc"
+                                    :src="tweet.quotePost.external.gifSrc ? tweet.quotePost.external.gifSrc : tweet.quotePost.external.imageSrc"
+                                    :alt="tweet.quotePost.external.alt" class="w-full object-contain" />
+                                </a>
+                                <div class="p-4" x-show="tweet.quotePost.external.title">
+                                  <a :href="tweet.quotePost.external.uri" target="_blank" class="block">
+                                    <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
+                                      x-text="tweet.quotePost.external.title"></h3>
+                                    <p class="text-gray-600 dark:text-gray-300 mt-2"
+                                      x-text="tweet.quotePost.external.description"></p>
+                                  </a>
+                                  <a :href="tweet.quotePost.external.uri" target="_blank"
+                                    class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
+                                      class="inline align-middle w-4 h-4">
+                                      <path
+                                        d="M16.09 2h-.17a14 14 0 0 0-9.61 3.9l-.41.41a1 1 0 0 0 0 1.41.92.92 0 0 0 .21.13.93.93 0 0 0 .33.38A18.75 18.75 0 0 0 10.08 10a17.31 17.31 0 0 0-1 5h-5a11.77 11.77 0 0 1 .87-3.61 9.83 9.83 0 0 1 .43-.93 1 1 0 1 0-1.77-.92q-.27.53-.51 1.08A14 14 0 1 0 16.09 2zm9.18 21.62A19 19 0 0 0 21.92 22a17.31 17.31 0 0 0 1-5h2a1 1 0 0 0 0-2H23a17.31 17.31 0 0 0-1-5 19 19 0 0 0 3.35-1.6 12 12 0 0 1 0 15.24zM4.05 17H9a17.31 17.31 0 0 0 1 5 19 19 0 0 0-3.35 1.6 12 12 0 0 1-2.6-6.6zM17 5.44a18.2 18.2 0 0 1 2.18 3.23A15.88 15.88 0 0 1 17 9zm1.65-1.13a12.06 12.06 0 0 1 5.17 2.6 16.43 16.43 0 0 1-2.68 1.22 19.59 19.59 0 0 0-2.49-3.82zM15 9a15.88 15.88 0 0 1-2.18-.3A18.2 18.2 0 0 1 15 5.44zm2 2a17.63 17.63 0 0 0 3-.43A15.38 15.38 0 0 1 21 15h-4zm4 6a15.38 15.38 0 0 1-1 4.46 17.63 17.63 0 0 0-3-.46v-4zm-6 9.56a18.2 18.2 0 0 1-2.18-3.23A15.88 15.88 0 0 1 15 23zM17 23a15.88 15.88 0 0 1 2.18.3A18.2 18.2 0 0 1 17 26.56zm-2-2a17.63 17.63 0 0 0-3 .43A15.38 15.38 0 0 1 11 17h4zm-4.14 2.84a19.59 19.59 0 0 0 2.49 3.82 12.06 12.06 0 0 1-5.17-2.6 16.43 16.43 0 0 1 2.68-1.19zm10.28 0a16.43 16.43 0 0 1 2.68 1.22 12.06 12.06 0 0 1-5.17 2.6 19.59 19.59 0 0 0 2.49-3.79zm-13-17a11.84 11.84 0 0 1 5.17-2.6 19.59 19.59 0 0 0-2.49 3.82 16.9 16.9 0 0 1-2.64-1.15zm3.86 3.7a17.63 17.63 0 0 0 3 .46v4h-4a15.38 15.38 0 0 1 1-4.46z" />
+                                    </svg>
+                                    <span x-text="tweet.quotePost.external.hostname" class="align-middle"></span>
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+
+                    <p class="mt-1.5 text-sm text-gray-600 flex justify-between items-center space-x-4">
+                      <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
+                      <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
+                      <span>Replies: <span x-text="tweet.replyCount"></span></span>
+                      <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
+                      <span>Reposts: <span x-text="tweet.repostCount"></span></span>
+                    </p>
+                    <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
-                          View thread
-                        </button>
-                      </div>
-                    </div>
-                  </template>
-
-                </li>
+                      View thread
+                    </button>
+                  </div>
+                </div>
               </template>
 
-              <p x-show="!loadingReplies && (!replies || replies.length === 0)"
-                class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                No replies yet.
-              </p>
-            </ul>
+            </li>
+          </template>
 
-            <!-- Footer -->
-            <div class="mt-5 text-right">
-              <p x-show="loadingMoreReplies && !loadingReplies"
-                class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                Loading more replies...
-              </p>
-              <button class="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-700
+          <p x-show="!loadingReplies && (!replies || replies.length === 0)"
+            class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+            No replies yet.
+          </p>
+        </ul>
+
+        <!-- Footer -->
+        <div class="mt-5 text-right">
+          <p x-show="loadingMoreReplies && !loadingReplies"
+            class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+            Loading more replies...
+          </p>
+          <button class="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-700
                  text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
-                @click="showModalReplies = false">
-                Close
-              </button>
-            </div>
-          </div>
+            @click="showModalReplies = false">
+            Close
+          </button>
         </div>
       </div>
-
-      <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
-        loading...
-      </p>
-      <p x-cloak x-show="trackedLength != 0 && trackedLength <= tweets?.length"
-        class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
-        wait for more...
-      </p>
     </div>
+  </div>
+
+  <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+    loading...
+  </p>
+  <p x-cloak x-show="trackedLength != 0 && trackedLength <= tweets?.length"
+    class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
+    wait for more...
+  </p>
+  </div>
 
   </div>
   <script>
@@ -1139,20 +1136,18 @@
           }
         },
         async loadBlob(databaseName, cid, repo) {
-          try {
-            let dbRes = await db[databaseName].get({ cid })
-            let mediaBlob = dbRes?.blob
-            if (!mediaBlob) {
-              mediaBlob = await this.getMediaBlob(cid, repo);
-              console.log("media downloading")
-              db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
-            } else {
-              console.log("media blob exists", cid)
-            }
-            return mediaBlob
-          } catch (err) {
-            console.error(err)
+
+          let dbRes = await db[databaseName].get({ cid })
+          let mediaBlob = dbRes?.blob
+          if (!mediaBlob) {
+            mediaBlob = await this.getMediaBlob(cid, repo);
+            console.log("media downloading")
+            db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
+          } else {
+            console.log("media blob exists", cid)
           }
+          return mediaBlob
+
         },
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
@@ -1570,7 +1565,14 @@
           return newTweet;
         },
         async loadEmbedDetails(newTweet, embed, repo) {
-          if (embed.$type?.includes("embed.images")) {
+          if (embed.$type?.includes("embed.recordWithMedia")) {
+            if (embed.media) {
+              newTweet = await this.loadEmbedDetails(newTweet, embed.media, repo);
+            }
+            if (embed.record) {
+              newTweet = await this.loadRecordEmbed(newTweet, embed);
+            }
+          } else if (embed.$type?.includes("embed.images")) {
             newTweet = await this.loadPostImages(newTweet, embed, repo)
           } else if (embed.$type?.includes("embed.external")) {
             newTweet = await this.formatEmbedExternal(newTweet, embed, repo)
@@ -1581,29 +1583,37 @@
               "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
             ];
           } else if (embed.$type.includes("embed.record")) {
-            console.log("embed record", embed);
-
-            const recordUri = embed.record?.uri || embed.record?.record?.uri;
-            const recordCid = embed.record?.cid || embed.record?.record?.cid;
-            const [_, __, recordRepo, collection, rkey] = recordUri.split("/");
-
-            if (recordUri) {
-              let quotePostSave = await db.posts.get({ cid: recordCid })
-
-              if (!quotePostSave) {
-                quotePostSave = (await this.getPosts(recordUri))?.posts[0];
-                console.log("saved quoted post", quotePostSave, recordCid, quotePostSave.cid)
-                db.posts.add({ ...quotePostSave, refreshTime: Date.now() })
-              }
-              if (!this.likeTracker[quotePostSave.uri])
-                this.likeTracker[quotePostSave.uri] = quotePostSave
-              console.log({ quotePostSave })
-              newTweet.quotePost = await this.transformPost(quotePostSave, 0, quotePostSave.author, quotePostSave.verifiers)
-            }
+            newTweet = await this.loadRecordEmbed(newTweet, embed);
           } else {
             console.log({ embed });
           }
           return newTweet
+        },
+        async loadRecordEmbed(newTweet, embed) {
+          console.log("embed record", embed);
+
+          const recordUri = embed.record?.uri || embed.record?.record?.uri;
+          const recordCid = embed.record?.cid || embed.record?.record?.cid;
+
+          if (recordUri) {
+            let quotePostSave = await db.posts.get({ cid: recordCid })
+
+            if (!quotePostSave) {
+              quotePostSave = (await this.getPosts(recordUri))?.posts[0];
+              console.log("saved quoted post", quotePostSave, recordCid, quotePostSave?.cid)
+              if (quotePostSave) {
+                db.posts.add({ ...quotePostSave, refreshTime: Date.now() })
+              }
+            }
+            if (quotePostSave?.uri && !this.likeTracker[quotePostSave.uri])
+              this.likeTracker[quotePostSave.uri] = quotePostSave
+            if (quotePostSave) {
+              console.log({ quotePostSave })
+              newTweet.quotePost = await this.transformPost(quotePostSave, 0, quotePostSave.author, quotePostSave.verifiers)
+            }
+          }
+
+          return newTweet;
         },
         async formatEmbedExternal(newTweet, embed, repo) {
           console.log("formatting embed external", newTweet, embed, repo)
@@ -1611,12 +1621,16 @@
           const { external } = embed;
           const { title, description, uri } = external;
           if (external.thumb) {
-            const blob = await this.loadBlob(
-              'images',
-              external.thumb.ref.$link,
-              repo
-            );
-            newTweet.external.imageSrc = URL.createObjectURL(blob);
+            try {
+              const blob = await this.loadBlob(
+                'images',
+                external.thumb.ref.$link,
+                repo
+              );
+              newTweet.external.imageSrc = URL.createObjectURL(blob);
+            } catch (err) {
+              console.error(err)
+            }
           }
           if (description.toLowerCase()?.startsWith("alt")) {
             newTweet.external.alt = description;

@@ -576,8 +576,8 @@
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
-           transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
-            View thread
+           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
+            View replies
           </button>
           <!-- "view quotes" button -->
           <button class="px-3 py-1.5 mt-2 text-sm rounded-md
@@ -587,6 +587,14 @@
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
             View quotes
+          </button>
+          <button class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadAuthorThread(tweet.uri); showModalReplies = true">
+            View thread
           </button>
         </div>
       </div>
@@ -906,7 +914,16 @@
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
-           transition" @click="loadReplyThread(tweet.uri); showModalReplies = true">
+           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
+                      View replies
+                    </button>
+                    <!-- "view thread" button -->
+                    <button class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadAuthorThread(tweet.uri); showModalReplies = true">
                       View thread
                     </button>
                   </div>
@@ -976,6 +993,7 @@
         showModalReplies: false,
         replies: [], // will be set only when modal for one post is open
         rawReplies: [],
+        authorThread: [],
         activeReply: "",
         open: false,
         menu: {
@@ -1070,10 +1088,27 @@
         },
         numRepliesToLoad: 10,
         async getAllParents(reply) {
+          console.log("getAllParents", reply)
           let parent = reply;
           while (parent) {
             this.rawReplies.unshift(parent);
             parent = parent.parent;//uh ok
+          }
+        },
+        async getAuthorThread(thread) {
+          console.log("getAuthorThread", thread)
+
+          let parent = thread.parent;
+          while (parent) {
+            this.rawReplies.unshift(parent);
+            parent = parent.parent;
+          }
+          let current = thread;
+          while (current) {
+            this.rawReplies.push(current);
+            const { post, replies } = current
+            const authorReply = replies?.find(reply => reply.post.author.did == post.author.did)
+            current = authorReply;
           }
         },
         async loadQuotes(uri) {
@@ -1088,7 +1123,6 @@
             //hacky: conform to replies format
             const replies = quotes.posts.map(p => ({ post: p })) ?? []
             // this.rawReplies.push(res.thread)
-            // // transformReplyRecordToPost()
             console.log("replies 0", replies[0]);
             this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
             await this.loadMoreReplies();
@@ -1099,14 +1133,31 @@
             this.loadingReplies = false;
           }
         },
-        async loadReplyThread(uri) {
+        async loadAuthorThread(uri) {
           this.activeReply = uri;
           this.loadingReplies = true;
           try {
             this.rawReplies = []
             this.replies = [];
             const res = await this.getPostThread(uri);
-            console.log(res);
+            await this.getAuthorThread(res.thread)
+            //this breaks if the post's index is greater than the number of replies
+            const newReplies = await Promise.all(this.rawReplies.map((r, i) => this.transformReplyRecordToPost(r, i)));
+            this.replies.push(...newReplies);
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loadingReplies = false;
+          }
+        },
+        async loadReplies(uri) {
+          this.activeReply = uri;
+          this.loadingReplies = true;
+          try {
+            this.rawReplies = []
+            this.replies = [];
+            const res = await this.getPostThread(uri);
+            console.log({ postThread: res, uri });
             if (res.thread?.parent) {
               //get all parents 
               this.getAllParents(res.thread.parent)
@@ -1114,6 +1165,7 @@
             }
             // { thread: { post: {...}, replies: [...] } }
             const replies = res.thread?.replies ?? [];
+
             this.rawReplies.push(res.thread)
             // transformReplyRecordToPost()
             console.log("replies 0", replies[0]);
@@ -1352,7 +1404,7 @@
             const { subject, createdAt, $type } = record || {};
             const { cid: likeCid, uri } = subject || {};
             if (!this.likeTracker[uri]?.timesUs?.length) {
-              this.likeTracker[uri] = { likeCount: 0, timesUs: [time_us] };
+              this.likeTracker[uri] = { likeCount: 0, timesUs: [] };
             }
             this.likeTracker[uri].timesUs.push(time_us);
             this.likeTracker[uri].totalLikeCount ? this.likeTracker[uri].totalLikeCount++ : 1;
@@ -1369,7 +1421,7 @@
             this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(1) })
             if (this.counter % 10 == 0 && !this.tweets?.length) {
-              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 2);
+              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 3)
               this.dots = dots;
             }
             if (

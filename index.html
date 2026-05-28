@@ -25,7 +25,7 @@
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
-      console.log({ oldData })
+      // console.log({ oldData })
       await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))))
       await db.trackedLikes.clear()
     } catch (err) {
@@ -588,7 +588,7 @@
            transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
             View quotes
           </button>
-          <button class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+          <button x-show="tweet.hasAuthorThread" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
@@ -918,7 +918,7 @@
                       View replies
                     </button>
                     <!-- "view thread" button -->
-                    <button class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+                    <button x-show="tweet.hasAuthorThread" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
@@ -1017,13 +1017,13 @@
         loadMenu() {
           const menuString = localStorage.getItem("menu");
           if (!menuString) return
-          console.log({ menuString })
+          // console.log({ menuString })
           this.menu = JSON.parse(menuString);
           this.labels = Object.keys(this.menu).filter(menuItem => menuItem.startsWith("show_")).map(key => key.split("show_")[1])
         },
         saveMenu() {
           const menuString = JSON.stringify(this.menu)
-          console.log({ menuString })
+          // console.log({ menuString })
           localStorage.setItem("menu", menuString)
 
         },
@@ -1057,7 +1057,7 @@
           }, {
             threshold: 0.3,
           })
-          console.log({ elements })
+          // console.log({ elements })
           elements.forEach(el => this.observer.observe(el))
         },
         async loadTrackedVideo(target, uri, label) {
@@ -1071,7 +1071,7 @@
             const videoBlob = await this.loadBlob('videos', videoLink, repo)
             target.video = URL.createObjectURL(videoBlob)
             target.images = []
-            console.log(`loaded ${label}`, target)
+            // console.log(`loaded ${label}`, target)
           } catch (err) {
             console.error(err)
           } finally {
@@ -1088,7 +1088,7 @@
         },
         numRepliesToLoad: 10,
         async getAllParents(reply) {
-          console.log("getAllParents", reply)
+          // console.log("getAllParents", reply)
           let parent = reply;
           while (parent) {
             this.rawReplies.unshift(parent);
@@ -1096,7 +1096,7 @@
           }
         },
         async getAuthorThread(thread) {
-          console.log("getAuthorThread", thread)
+          // console.log("getAuthorThread", thread)
 
           let parent = thread.parent;
           while (parent) {
@@ -1118,12 +1118,12 @@
             this.rawReplies = []
             this.replies = [];
             const quotes = await this.getQuotes(uri);
-            console.log({ quotes });
+            // console.log({ quotes });
 
             //hacky: conform to replies format
             const replies = quotes.posts.map(p => ({ post: p })) ?? []
             // this.rawReplies.push(res.thread)
-            console.log("replies 0", replies[0]);
+            // console.log("replies 0", replies[0]);
             this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
             await this.loadMoreReplies();
           } catch (e) {
@@ -1139,7 +1139,7 @@
           try {
             this.rawReplies = []
             this.replies = [];
-            const res = await this.getPostThread(uri);
+            const res = await this.getPostThread(uri, 100);
             await this.getAuthorThread(res.thread)
             //this breaks if the post's index is greater than the number of replies
             const newReplies = await Promise.all(this.rawReplies.map((r, i) => this.transformReplyRecordToPost(r, i)));
@@ -1157,18 +1157,18 @@
             this.rawReplies = []
             this.replies = [];
             const res = await this.getPostThread(uri);
-            console.log({ postThread: res, uri });
+            // console.log({ postThread: res, uri });
             if (res.thread?.parent) {
               //get all parents 
               this.getAllParents(res.thread.parent)
-              console.log({ parent })
+              // console.log({ parent })
             }
             // { thread: { post: {...}, replies: [...] } }
             const replies = res.thread?.replies ?? [];
 
             this.rawReplies.push(res.thread)
             // transformReplyRecordToPost()
-            console.log("replies 0", replies[0]);
+            // console.log("replies 0", replies[0]);
             this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
             await this.loadMoreReplies();
           } catch (e) {
@@ -1205,17 +1205,17 @@
           let mediaBlob = dbRes?.blob
           if (!mediaBlob) {
             mediaBlob = await this.getMediaBlob(cid, repo);
-            console.log("media downloading")
+            // console.log("media downloading")
             db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
           } else {
-            console.log("media blob exists", cid)
+            // console.log("media blob exists", cid)
           }
           return mediaBlob
 
         },
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
-          console.log({ newTweets })
+          // console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri, quotePost } = newTweets[index];
             await this.loadVideoInLikeTracker(uri);
@@ -1255,7 +1255,7 @@
           }
         },
         async loadMore() {
-          console.log("load", this.numToTrack);
+          // console.log("load", this.numToTrack);
           this.numToTrack += 5;
           await this.loadVisibleTweets(this.menu.sortField);
         },
@@ -1344,7 +1344,7 @@
             // default behaviour: shown (or false if you prefer)
             this.menu[key] = false;
           }
-          console.log('key', key, `this.menu[key]`, this.menu[key])
+          // console.log('key', key, `this.menu[key]`, this.menu[key])
           return this.menu[key];
         },
         // 🔹 Toggle a label’s visibility
@@ -1356,7 +1356,7 @@
           const queryString = window.location.search;
           const urlParams = new URLSearchParams(queryString);
           const wantedCollections = urlParams.get("q") || 'app.bsky.feed.like'
-          console.log({ wantedCollections })
+          // console.log({ wantedCollections })
           if (this.websocket) {
             this.websocket.close();
           }
@@ -1372,7 +1372,7 @@
           };
 
           this.websocket.onclose = (event) => {
-            console.log(event);
+            // console.log(event);
           };
 
           this.websocket.onerror = (error) => {
@@ -1381,11 +1381,11 @@
 
           this.websocket.onmessage = async (event) => {
             // const event = JSON.parse(event)
-            // console.log(event)
+            // // console.log(event)
             const data = JSON.parse(event.data);
             const { commit, time_us } = data;
 
-            // console.log(data)
+            // // console.log(data)
             if (!commit) return;
 
             const { operation, cid, record, rkey, collection } = commit || {};
@@ -1440,16 +1440,16 @@
                 }));
 
               // .sort((a, b) => b.likeCount - a.likeCount);
-              // console.log({ trackedProperNouns })
+              // // console.log({ trackedProperNouns })
 
-              console.log("count length", trackedProperNouns.length);
+              // console.log("count length", trackedProperNouns.length);
               let tweets = trackedProperNouns
                 .filter((r) => r.content)
                 .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
 
               const dbput = tweets.map(t => ({ likeCount: t.likeCount, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
               db.trackedLikes.bulkPut(dbput).then(() => {
-                console.log("Done adding 100,000 raindrops all over the place");
+                // console.log("Done adding 100,000 raindrops all over the place");
               }).catch(error => {
                 if (error.name === "BulkError") {
                   // Explicitly catching the bulkAdd() operation makes those successful
@@ -1471,7 +1471,7 @@
               }
 
               const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
-              // console.log({ series })
+              // // console.log({ series })
               this.chart.updateSeries(series);
             }
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == this.postThreshold) {
@@ -1480,31 +1480,37 @@
 
                 let postSave = await db.posts.get({ cid: likeCid })
                 if (postSave?.videoLink ? postSave?.viewCount > 1 : postSave?.viewCount > 0) {
-                  console.log("already seen this", postSave);
+                  // console.log("already seen this", postSave);
                   //todo should i delete the assets? no need to keep in memory, it won't be shown again
                   return;
                 }
                 if (!postSave) {
                   postSave = (await this.getPosts(uri))?.posts[0];
-                  console.log({ postSave }, likeCid, postSave.cid)
+                  const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
+                  // // console.log({ post, replies })
+                  postSave.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
+                  // // console.log({ postSave }, likeCid, postSave.cid)
                   db.posts.add({ ...postSave, refreshTime: Date.now() })
                 }
+                const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
+                // // console.log({ post, replies })
+                postSave.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
                 const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
-                console.log({ labels })
+                // console.log({ labels })
                 if (!record) return;
 
                 const { handle, avatar, displayName } = author || {};
                 let authorSave = await db.authors.get({ handle })
-                // console.log({ authorSave })
+                // // console.log({ authorSave })
                 //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
                 if (!authorSave) { //refresh time over 24 hours ago
                   const authorProfile = await this.getProfile(repo);
-                  console.log({ authorProfile })
+                  // console.log({ authorProfile })
                   db.authors.add({ ...authorProfile, refreshTime: Date.now() })
                   authorSave = { ...authorProfile, refreshTime: Date.now() }
                 }
                 const ratio = authorSave.followersCount / totalLikeCount
-                console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
+                // console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
                 if (this.menu.noBigAccounts && ratio > 25) return;
 
                 let verifiersSave = []
@@ -1534,7 +1540,7 @@
                 }
                 const newTweet = await this.transformPost(postSave, this.postorder, authorSave, verifiersSave)
                 this.postorder++;
-                if (newTweet.quotePost) console.log({ newTweet })
+                if (newTweet.quotePost) // console.log({ newTweet })
                 if (this.likeTracker[uri]) {
                   const { likeCount, timesUs } = this.likeTracker[uri];
                   this.likeTracker[uri] = {
@@ -1550,7 +1556,7 @@
             }
 
             if (this.counter % 10000 == 0) {
-              console.log("this.counter", this.counter)
+              // console.log("this.counter", this.counter)
 
               // this.likeTracker = {};
               // for (const tpNoun of tweets.slice(0, 1000)) {
@@ -1573,20 +1579,20 @@
         addVisibilityListeners() {
           document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
-              console.log("Page is visible, restarting WebSocket...");
+              // console.log("Page is visible, restarting WebSocket...");
               this.startWebsocket();
             }
           });
 
           // Event listener for window focus
           window.addEventListener("focus", () => {
-            console.log("Window focused, restarting WebSocket...");
+            // console.log("Window focused, restarting WebSocket...");
             this.startWebsocket();
           });
         },
         async transformPost(post, postorder, authorSave = {}, verifiersSave = []) {
 
-          const { author, record, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid } = post || {}
+          const { author, record, hasAuthorThread, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
           const { embed, langs } = record;
@@ -1612,6 +1618,7 @@
             profileUrl: `https://bsky.app/profile/${handle}`,
             rkey,
             langs,
+            hasAuthorThread,
             author: authorSave,
             verifiers: verifiersSave
           };
@@ -1622,12 +1629,11 @@
           return newTweet
         },
         async transformReplyRecordToPost(replyRecord, postorder) {
-          console.log({ replyRecord });
+          // // console.log({ replyRecord });
           const { $type, post, replies, threadContext } = replyRecord || {}
           const newTweet = await this.transformPost(post, postorder);
           if (replies?.length) {
-            // const replyPosts = await Promise.all(replies.map((r, i) => this.transformPost(r.post, i)))
-            // newTweet.replies = replyPosts; //todo threaded
+            newTweet.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
           }
           return newTweet;
         },
@@ -1644,7 +1650,7 @@
           } else if (embed.$type?.includes("embed.external")) {
             newTweet = await this.formatEmbedExternal(newTweet, embed, repo)
           } else if (embed.$type?.includes("embed.video")) {
-            console.log("video", { embed })
+            // console.log("video", { embed })
             newTweet.videoLink = embed.video.ref.$link;
             newTweet.images = [
               "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
@@ -1652,12 +1658,12 @@
           } else if (embed.$type.includes("embed.record")) {
             newTweet = await this.loadRecordEmbed(newTweet, embed);
           } else {
-            console.log({ embed });
+            // console.log({ embed });
           }
           return newTweet
         },
         async loadRecordEmbed(newTweet, embed) {
-          console.log("embed record", embed);
+          // console.log("embed record", embed);
 
           const recordUri = embed.record?.uri || embed.record?.record?.uri;
           const recordCid = embed.record?.cid || embed.record?.record?.cid;
@@ -1667,7 +1673,7 @@
 
             if (!quotePostSave) {
               quotePostSave = (await this.getPosts(recordUri))?.posts[0];
-              console.log("saved quoted post", quotePostSave, recordCid, quotePostSave?.cid)
+              // console.log("saved quoted post", quotePostSave, recordCid, quotePostSave?.cid)
               if (quotePostSave) {
                 db.posts.add({ ...quotePostSave, refreshTime: Date.now() })
               }
@@ -1675,7 +1681,7 @@
             if (quotePostSave?.uri && !this.likeTracker[quotePostSave.uri])
               this.likeTracker[quotePostSave.uri] = quotePostSave
             if (quotePostSave) {
-              console.log({ quotePostSave })
+              // console.log({ quotePostSave })
               newTweet.quotePost = await this.transformPost(quotePostSave, 0, quotePostSave.author, quotePostSave.verifiers)
             }
           }
@@ -1683,7 +1689,7 @@
           return newTweet;
         },
         async formatEmbedExternal(newTweet, embed, repo) {
-          console.log("formatting embed external", newTweet, embed, repo)
+          // console.log("formatting embed external", newTweet, embed, repo)
           newTweet.external = {}; // embed;
           const { external } = embed;
           const { title, description, uri } = external;
@@ -1715,7 +1721,7 @@
           newTweet.images = [];
           try {
             for (const img of embed.images) {
-              console.log("IMG", img);
+              // console.log("IMG", img);
               const blob = await this.loadBlob(
                 'images',
                 img.image.ref.$link,
@@ -1756,8 +1762,8 @@
           const posts = await fetchFrom(url);
           return posts;
         },
-        async getPostThread(uri) {
-          const queryParams = new URLSearchParams({ uri }).toString();
+        async getPostThread(uri, depth = 6) {
+          const queryParams = new URLSearchParams({ uri, depth }).toString();
           const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${queryParams}`;
           const posts = await fetchFrom(url);
           return posts;

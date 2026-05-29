@@ -1213,15 +1213,28 @@
           return mediaBlob
 
         },
+        async doesPostHaveAuthorThread(uri) {
+          const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
+          // // console.log({ post, replies })
+          return replies?.some(reply => reply.post.author.did == post.author.did)
+        },
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
+          const allHasAuthorThread = await Promise.allSettled(newTweets.map(tweet=>this.doesPostHaveAuthorThread(tweet.uri)))
           console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri, quotePost } = newTweets[index];
             await this.loadVideoInLikeTracker(uri);
             const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
-            if (currentTweetIndex)
-              newTweets[index] = this.likeTracker[uri]
+            if (currentTweetIndex !== -1 && this.likeTracker[uri]) {
+              newTweets[index] = {
+                ...newTweets[index],
+                ...this.likeTracker[uri],
+              };
+            }
+            newTweets[index].hasAuthorThread = allHasAuthorThread[index]?.status === 'fulfilled'
+              ? allHasAuthorThread[index].value
+              : false
           }
           this.tweets = newTweets
           this.postIntersectionObserver(document.querySelectorAll('.post'))
@@ -1485,9 +1498,7 @@
                   postSave = (await this.getPosts(uri))?.posts[0];
                   db.posts.add({ ...postSave, refreshTime: Date.now() })
                 }
-                const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
-                // // console.log({ post, replies })
-                postSave.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
+
                 const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
                 // console.log({ labels })
                 // if (!record) return;

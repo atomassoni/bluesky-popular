@@ -1215,7 +1215,7 @@
         },
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
-          // console.log({ newTweets })
+          console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri, quotePost } = newTweets[index];
             await this.loadVideoInLikeTracker(uri);
@@ -1420,15 +1420,15 @@
             }
             this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(1) })
-            if (this.counter % 10 == 0 && !this.tweets?.length) {
-              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 3)
+            if (this.counter % 15 == 0 && !this.tweets?.length) {
+              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 2)
               this.dots = dots;
             }
             if (
               this.counter % 5000 == 0 ||
               (this.counter < 10000 && this.counter % 1000 == 0)
             ) {
-              const trackedProperNouns = Object.entries(this.likeTracker)
+              const trackedPosts = Object.entries(this.likeTracker)
                 .map(([link, record]) => ({
                   link,
                   ...record,
@@ -1439,11 +1439,7 @@
                     : null,
                 }));
 
-              // .sort((a, b) => b.likeCount - a.likeCount);
-              // // console.log({ trackedProperNouns })
-
-              // console.log("count length", trackedProperNouns.length);
-              let tweets = trackedProperNouns
+              let tweets = trackedPosts
                 .filter((r) => r.content)
                 .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
 
@@ -1461,7 +1457,8 @@
                   throw error; // we're only handling BulkError specifically here...
                 }
               });
-              this.allPosts = this.filterPosts(tweets);
+              const allPosts = this.filterPosts(tweets);
+              this.allPosts = allPosts;
               this.trackedLength = tweets.length;
 
               if (!this.showOnlyUri) {
@@ -1479,17 +1476,13 @@
               try {
 
                 let postSave = await db.posts.get({ cid: likeCid })
-                if (postSave?.videoLink ? postSave?.viewCount > 1 : postSave?.viewCount > 0) {
-                  // console.log("already seen this", postSave);
+                if (postSave?.viewCount > 0) {
+                  //console.log("already seen this", postSave);
                   //todo should i delete the assets? no need to keep in memory, it won't be shown again
                   return;
                 }
                 if (!postSave) {
                   postSave = (await this.getPosts(uri))?.posts[0];
-                  const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
-                  // // console.log({ post, replies })
-                  postSave.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
-                  // // console.log({ postSave }, likeCid, postSave.cid)
                   db.posts.add({ ...postSave, refreshTime: Date.now() })
                 }
                 const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
@@ -1497,7 +1490,7 @@
                 postSave.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
                 const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
                 // console.log({ labels })
-                if (!record) return;
+                // if (!record) return;
 
                 const { handle, avatar, displayName } = author || {};
                 let authorSave = await db.authors.get({ handle })
@@ -1540,7 +1533,7 @@
                 }
                 const newTweet = await this.transformPost(postSave, this.postorder, authorSave, verifiersSave)
                 this.postorder++;
-                if (newTweet.quotePost) // console.log({ newTweet })
+                // if (newTweet.quotePost) // console.log({ newTweet })
                 if (this.likeTracker[uri]) {
                   const { likeCount, timesUs } = this.likeTracker[uri];
                   this.likeTracker[uri] = {
@@ -1557,19 +1550,11 @@
 
             if (this.counter % 10000 == 0) {
               // console.log("this.counter", this.counter)
-
-              // this.likeTracker = {};
-              // for (const tpNoun of tweets.slice(0, 1000)) {
-              //   const { link, ...rest } = tpNoun;
-              //   this.likeTracker[link] = rest;
-              // }
               let newCount = 0
               for (const uri in this.likeTracker) {
-
                 if (this.likeTracker[uri]?.content) {
                   newCount++
-
-                } else if (this.likeTracker[uri].likeCount < 6) {
+                } else if (this.likeTracker[uri].likeCount < 5) {
                   delete this.likeTracker[uri]
                 }
               }

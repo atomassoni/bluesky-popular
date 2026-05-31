@@ -584,7 +584,7 @@
             :class="tweet.viewerLike
               ? 'border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-300 dark:hover:bg-pink-900/40'
               : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'" @click="toggleLike(tweet)">
-            <span x-text="tweet.likePending ? 'Working…' : (tweet.viewerLike ? 'Unlike' :  'Like' )"></span>
+            <span x-text="tweet.viewerLike ? 'Unlike' :  'Like'"></span>
           </button>
           <p x-show="tweet.likeError" x-cloak class="text-sm text-red-600 dark:text-red-400" x-text="tweet.likeError">
           </p>
@@ -1123,9 +1123,8 @@
           this.clearViewerLikes();
         },
         async toggleLike(tweet) {
-          // todo it doesn't console log when i click unless there's a rerender i think?
-          console.log("click", tweet)
           if (tweet.likePending) return;
+          tweet.likePending = true;
           try {
             const currentLikeUri = tweet.viewerLike || null;
             const wasLiked = Boolean(currentLikeUri);
@@ -1138,14 +1137,14 @@
                 cid: tweet.cid,
               });
             }
-            tweet.likePending = false
             tweet.likeError = ""
             tweet.viewerLike = createdLike?.uri || null
             this.likeTracker[tweet.uri].viewerLike = createdLike?.uri || null
           } catch (error) {
             console.error(error);
-            tweet.likePending = false
             tweet.likeError = error.message || "Unable to update like."
+          } finally {
+            tweet.likePending = false
           }
         },
         async startLogin() {

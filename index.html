@@ -1944,7 +1944,6 @@
             return newTweet
           }
         },
-        //todo get the pds endpoint from the auth session
         getEndpoint(lexiconApi) {
           const baseUrl = this.auth?.session ? this.auth.session.pdsEndpoint : "https://public.api.bsky.app";
           return `${baseUrl}/xrpc/${lexiconApi}`
@@ -1952,7 +1951,12 @@
         async makeRequest(lexiconApi, requestParams) {
           const endpoint = this.getEndpoint(lexiconApi);
           const url = `${endpoint}?${requestParams}`;
-          const res = await this.fetchGet(url);
+          return this.auth?.session ? authenticatedXrpcRequest(this.auth.session, url, { method: "GET" }) : fetchFrom(url)
+        },
+        async publicRequest(lexiconApi, requestParams) {
+          const endpoint = `https://public.api.bsky.app/xrpc/${lexiconApi}`
+          const url = `${endpoint}?${requestParams}`;
+          const res = await fetchFrom(url);
           return res;
         },
         async getServices(actorIdentifier) {
@@ -1960,7 +1964,7 @@
             dids: actorIdentifier,
             detailed: true,
           }).toString();
-          const profile = await this.makeRequest(
+          const profile = await this.publicRequest(
             "app.bsky.labeler.getServices",
             queryParams
           );
@@ -1970,7 +1974,7 @@
           const queryParams = new URLSearchParams({
             actor: actorIdentifier,
           }).toString();
-          const profile = await this.makeRequest(
+          const profile = await this.publicRequest(
             "app.bsky.actor.getProfile",
             queryParams
           );
@@ -1984,7 +1988,8 @@
         //todo add authenticated getActorLikes?
         async getPostThread(uri, depth = 6) {
           const queryParams = new URLSearchParams({ uri, depth }).toString();
-          const posts = await this.makeRequest(
+          //todo after adding the like button to replies switch to makeRequest
+          const posts = await this.publicRequest(
             "app.bsky.feed.getPostThread",
             queryParams
           );
@@ -1992,7 +1997,7 @@
         },
         async getQuotes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
-          const posts = await this.makeRequest(
+          const posts = await this.publicRequest(
             "app.bsky.feed.getQuotes",
             queryParams
           );
@@ -2008,9 +2013,7 @@
           const imageBlob = await fetchFrom(url, "blob");
           return imageBlob;
         },
-        async fetchGet(url) {
-          return this.auth?.session ? authenticatedXrpcRequest(this.auth.session, url, { method: "GET" }) : fetchFrom(url)
-        }
+       
       };
     }
     async function fetchFrom(url, type = "application/json") {

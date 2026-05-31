@@ -580,12 +580,10 @@
         <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
-          <button x-show="auth.session"  class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
+          <button x-show="auth.session" class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
             :class="tweet.viewerLike
               ? 'border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-300 dark:hover:bg-pink-900/40'
-              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'" 
-              @click="toggleLike(tweet)" 
-            >
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'" @click="toggleLike(tweet)">
             <span x-text="tweet.likePending ? 'Working…' : (tweet.viewerLike ? 'Unlike' :  'Like' )"></span>
           </button>
           <p x-show="tweet.likeError" x-cloak class="text-sm text-red-600 dark:text-red-400" x-text="tweet.likeError">
@@ -1805,7 +1803,7 @@
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
           const { embed, langs } = record;
-console.log({viewer})
+          const {like, bookmarked } = viewer || {}
 
           let newTweet = {
             id: cid,
@@ -1832,6 +1830,7 @@ console.log({viewer})
             hasAuthorThread,
             author: authorSave,
             verifiers: verifiersSave,
+            viewerLike: like
           };
           //get embeds async pull out?
           if (embed) {
@@ -1946,44 +1945,58 @@ console.log({viewer})
             return newTweet
           }
         },
+        //todo get the pds endpoint from the auth session
+        getEndpoint(lexiconApi) {
+          const baseUrl = this.auth?.session ? this.auth.session.pdsEndpoint : "https://public.api.bsky.app";
+          return `${baseUrl}/xrpc/${lexiconApi}`
+        },
+        async makeRequest(lexiconApi, requestParams) {
+          const endpoint = this.getEndpoint(lexiconApi);
+          const url = `${endpoint}?${requestParams}`;
+          const res = await this.fetchGet(url);
+          return res;
+        },
         async getServices(actorIdentifier) {
-          const endpoint =
-            "https://public.api.bsky.app/xrpc/app.bsky.labeler.getServices";
-          const url = `${endpoint}?dids=${actorIdentifier}&detailed=true`;
-          const profile = await fetchFrom(url);
+          const queryParams = new URLSearchParams({
+            dids: actorIdentifier,
+            detailed: true,
+          }).toString();
+          const profile = await this.makeRequest(
+            "app.bsky.labeler.getServices",
+            queryParams
+          );
           return profile;
         },
         async getProfile(actorIdentifier) {
-          const endpoint = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile`;
-          const url = `${endpoint}?actor=${encodeURIComponent(
-            actorIdentifier
-          )}`;
-          const profile = await this.fetchGet(url);
-          return profile;
-        },
-        async getReply(parent) {
-          const queryParams = new URLSearchParams(parent).toString();
-          const url = `https://public.api.bsky.app/xrpc/com.atproto.repo.getRecord?${queryParams}`;
-          const profile = await this.fetchGet(url);
+          const queryParams = new URLSearchParams({
+            actor: actorIdentifier,
+          }).toString();
+          const profile = await this.makeRequest(
+            "app.bsky.actor.getProfile",
+            queryParams
+          );
           return profile;
         },
         async getPosts(uris) {
           const queryParams = new URLSearchParams({ uris }).toString();
-          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?${queryParams}`;
-          const posts = await this.fetchGet(url);
-          return posts;
+          const res = await this.makeRequest("app.bsky.feed.getPosts", queryParams);
+          return res;
         },
-        //todo add authenticated getActorLikes
+        //todo add authenticated getActorLikes?
         async getPostThread(uri, depth = 6) {
           const queryParams = new URLSearchParams({ uri, depth }).toString();
-          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${queryParams}`;
-          const posts = await this.fetchGet(url);
+          const posts = await this.makeRequest(
+            "app.bsky.feed.getPostThread",
+            queryParams
+          );
           return posts;
         },
         async getQuotes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
-          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getQuotes?${queryParams}`;
-          const posts = await this.fetchGet(url);
+          const posts = await this.makeRequest(
+            "app.bsky.feed.getQuotes",
+            queryParams
+          );
           return posts;
         },
         async getMediaBlob($link, did) {
@@ -1995,15 +2008,6 @@ console.log({viewer})
           const url = `${pdsEndpoint}/xrpc/com.atproto.sync.getBlob?${queryParams}`;
           const imageBlob = await fetchFrom(url, "blob");
           return imageBlob;
-        },
-        async getPreferences() {
-          //authenticated request of logged in user
-          const endpoint = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile`;
-          const url = `${endpoint}?actor=${encodeURIComponent(
-            actorIdentifier
-          )}`;
-          const profile = await fetchFrom(url);
-          return profile;
         },
         async fetchGet(url) {
           return this.auth?.session ? authenticatedXrpcRequest(this.auth.session, url, { method: "GET" }) : fetchFrom(url)
@@ -2074,6 +2078,7 @@ console.log({viewer})
     }
 
     async function googleDnsTxtHandleLookup(handle) {
+      //there's also a cloudflare one
       const res = await fetch(
         `https://dns.google/resolve?name=_atproto.${handle}&type=TXT`
       );
@@ -2387,15 +2392,6 @@ console.log({viewer})
       const url = `${session.pdsEndpoint}/xrpc/app.bsky.actor.getPreferences`;
       return authenticatedXrpcRequest(session, url, { method: "GET" });
     }
-
-    async function getAuthenticatedPosts(session, uris) {
-      const params = new URLSearchParams();
-      uris.forEach((uri) => params.append("uris", uri));
-      const url = `${session.pdsEndpoint}/xrpc/app.bsky.feed.getPosts?${params.toString()}`;
-      return authenticatedXrpcRequest(session, url, { method: "GET" });
-    }
-
-
 
     async function createLikeRecord(session, subject) {
       if (!subject?.uri || !subject?.cid) {

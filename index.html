@@ -221,7 +221,7 @@
     <div class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
       <!-- Tweets List -->
       <div>
-        <template x-for="tweet in tweets" :key="tweet.id">
+        <template x-for="(tweet, index) in tweets" :key="tweet.cid">
           <!-- start of tweet div -->
           <div class="post">
             <!-- tweet main -->
@@ -580,17 +580,16 @@
         <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
+          <button x-show="auth.session"  class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
             :class="tweet.viewerLike
               ? 'border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-300 dark:hover:bg-pink-900/40'
-              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
-            :disabled="tweet.likePending"
-            @click="toggleLike(tweet)">
-            <span
-              x-text="tweet.likePending ? 'Working…' : (tweet.viewerLike ? 'Unlike' : (auth.session ? 'Like' : 'Log in to like'))"></span>
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'" 
+              @click="toggleLike(tweet)" 
+            >
+            <span x-text="tweet.likePending ? 'Working…' : (tweet.viewerLike ? 'Unlike' :  'Like' )"></span>
           </button>
-          <p x-show="tweet.likeError" x-cloak class="text-sm text-red-600 dark:text-red-400" x-text="tweet.likeError"></p>
+          <p x-show="tweet.likeError" x-cloak class="text-sm text-red-600 dark:text-red-400" x-text="tweet.likeError">
+          </p>
         </div>
 
         <!-- view replies div -->
@@ -651,7 +650,7 @@
         <!-- Replies -->
         <ul x-show="!loadingReplies" class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
           @scroll="maybeLoadMore($el)">
-          <template x-for="tweet in replies" :key="tweet.id">
+          <template x-for="tweet in replies" :key="tweet.cid">
             <li class="py-2">
               <template x-if="tweet.uri === activeReply">
                 <div>
@@ -990,7 +989,8 @@
           <h2 class="text-lg font-semibold">Login with Bluesky</h2>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Enter your handle to start OAuth.</p>
         </div>
-        <button class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+        <button
+          class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           @click="closeLoginModal()">&times;</button>
       </div>
 
@@ -1094,12 +1094,16 @@
           this.chartIt()
 
         },
-        loadAuthSession() {
+        async loadAuthSession() {
           this.auth.session = loadOAuthSession();
+          if (!this.auth.session) return
           if (this.auth.session?.handle) {
             this.auth.handleInput = this.auth.session.handle;
           }
-          this.refreshViewerLikesForPosts(this.tweets);
+          const prefs = await getPreferences(this.auth.session);
+          console.log({ prefs })
+          const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2")
+          console.log({ feeds })
         },
         openLoginModal() {
           this.auth.error = "";
@@ -1120,137 +1124,30 @@
           this.auth.error = "";
           this.clearViewerLikes();
         },
-        clearViewerLikes() {
-          this.updatePostsByUri(null, () => ({
-            viewerLike: null,
-            viewerLikeLoaded: false,
-            likePending: false,
-            likeError: "",
-          }));
-        },
-        findPostByUri(uri) {
-          const collections = [this.tweets, this.allPosts, this.replies, this.rawReplies];
-          for (const collection of collections) {
-            const match = collection?.find(post => post?.uri === uri);
-            if (match) return match;
-          }
-          return null;
-        },
-        updatePostsByUri(uri, updater) {
-          const applyToCollection = (collection) => {
-            if (!Array.isArray(collection)) return;
-            collection.forEach((post) => {
-              if (uri && post?.uri !== uri) return;
-              const updates = typeof updater === "function" ? updater(post) : updater;
-              if (updates && typeof updates === "object") {
-                Object.assign(post, updates);
-              }
-            });
-          };
-
-          [this.tweets, this.allPosts, this.replies, this.rawReplies].forEach(applyToCollection);
-
-          if (uri && this.likeTracker[uri] && this.likeTracker[uri] !== true) {
-            const updates = typeof updater === "function" ? updater(this.likeTracker[uri]) : updater;
-            if (updates && typeof updates === "object") {
-              Object.assign(this.likeTracker[uri], updates);
-            }
-          }
-        },
-        async requireLikeSession() {
-          const session = loadOAuthSession();
-          if (!session) {
-            this.openLoginModal();
-            throw new Error("Log in to like posts.");
-          }
-          if (!session.dpopPublicJwk || !session.dpopPrivateJwk) {
-            clearOAuthSession();
-            this.auth.session = null;
-            this.openLoginModal();
-            throw new Error("Please log in again to refresh your Bluesky session.");
-          }
-
-          this.auth.session = session;
-          this.auth.handleInput = session.handle || this.auth.handleInput;
-          return session;
-        },
-        async refreshViewerLikesForPosts(posts) {
-          const uris = [...new Set((posts || []).map(post => post?.uri).filter(Boolean))];
-          if (!uris.length) return;
-
-          const session = loadOAuthSession();
-          if (!session?.accessToken || !session?.dpopPublicJwk || !session?.dpopPrivateJwk) return;
-
-          this.auth.session = session;
-
-          try {
-            for (const chunk of chunkArray(uris, 25)) {
-              const response = await getAuthenticatedPosts(session, chunk);
-              for (const postView of response?.posts || []) {
-                this.updatePostsByUri(postView.uri, {
-                  cid: postView.cid,
-                  totalLikeCount: postView.likeCount,
-                  viewerLike: postView.viewer?.like || null,
-                  viewerLikeLoaded: true,
-                  likeError: "",
-                });
-              }
-            }
-          } catch (error) {
-            console.error("Failed to refresh viewer like state:", error);
-          }
-        },
         async toggleLike(tweet) {
+          // todo it doesn't console log when i click unless there's a rerender i think?
+          console.log("click", tweet)
           if (tweet.likePending) return;
-
           try {
-            const session = await this.requireLikeSession();
-            if (!tweet.viewerLikeLoaded) {
-              await this.refreshViewerLikesForPosts([tweet]);
-            }
-
-            const currentTweet = this.findPostByUri(tweet.uri) || tweet;
-            const currentLikeUri = currentTweet.viewerLike || null;
+            const currentLikeUri = tweet.viewerLike || null;
             const wasLiked = Boolean(currentLikeUri);
-            const previousLikeCount = Number(currentTweet.totalLikeCount || 0);
-
-            this.updatePostsByUri(tweet.uri, {
-              likePending: true,
-              likeError: "",
-              viewerLikeLoaded: true,
-              viewerLike: wasLiked ? null : "__pending_like__",
-              totalLikeCount: wasLiked ? Math.max(0, previousLikeCount - 1) : previousLikeCount + 1,
-            });
-
+            let createdLike
             if (wasLiked) {
-              await deleteLikeRecord(session, currentLikeUri);
-              this.updatePostsByUri(tweet.uri, {
-                likePending: false,
-                likeError: "",
-                viewerLike: null,
-                viewerLikeLoaded: true,
-              });
+              await deleteLikeRecord(this.auth.session, currentLikeUri);
             } else {
-              const createdLike = await createLikeRecord(session, {
-                uri: currentTweet.uri,
-                cid: currentTweet.cid || currentTweet.id,
-              });
-              this.updatePostsByUri(tweet.uri, {
-                likePending: false,
-                likeError: "",
-                viewerLike: createdLike.uri,
-                viewerLikeLoaded: true,
+              createdLike = await createLikeRecord(this.auth.session, {
+                uri: tweet.uri,
+                cid: tweet.cid,
               });
             }
+            tweet.likePending = false
+            tweet.likeError = ""
+            tweet.viewerLike = createdLike?.uri || null
+            this.likeTracker[tweet.uri].viewerLike = createdLike?.uri || null
           } catch (error) {
             console.error(error);
-            const currentTweet = this.findPostByUri(tweet.uri) || tweet;
-            this.updatePostsByUri(tweet.uri, {
-              likePending: false,
-              likeError: error.message || "Unable to update like.",
-              viewerLike: currentTweet.viewerLike === "__pending_like__" ? null : currentTweet.viewerLike,
-            });
-            await this.refreshViewerLikesForPosts([tweet]);
+            tweet.likePending = false
+            tweet.likeError = error.message || "Unable to update like."
           }
         },
         async startLogin() {
@@ -1443,7 +1340,6 @@
             // console.log("replies 0", replies[0]);
             this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
             await this.loadMoreReplies();
-            await this.refreshViewerLikesForPosts(this.replies);
           } catch (e) {
             console.error(e);
             this.replies = [];
@@ -1462,7 +1358,6 @@
             //this breaks if the post's index is greater than the number of replies
             const newReplies = await Promise.all(this.rawReplies.map((r, i) => this.transformReplyRecordToPost(r, i)));
             this.replies.push(...newReplies);
-            await this.refreshViewerLikesForPosts(this.replies);
           } catch (err) {
             console.error(err);
           } finally {
@@ -1490,7 +1385,6 @@
             // console.log("replies 0", replies[0]);
             this.rawReplies.push(...replies.sort((a, b) => (b.post.likeCount || 0) - (a.post.likeCount || 0)))
             await this.loadMoreReplies();
-            await this.refreshViewerLikesForPosts(this.replies);
           } catch (e) {
             console.error(e);
             this.replies = [];
@@ -1557,7 +1451,6 @@
               : false
           }
           this.tweets = newTweets
-          await this.refreshViewerLikesForPosts(this.tweets);
           this.postIntersectionObserver(document.querySelectorAll('.post'))
           this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
         },
@@ -1908,11 +1801,11 @@
           });
         },
         async transformPost(post, postorder, authorSave = {}, verifiersSave = []) {
-
           const { author, record, hasAuthorThread, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
           const { embed, langs } = record;
+console.log({viewer})
 
           let newTweet = {
             id: cid,
@@ -1939,10 +1832,6 @@
             hasAuthorThread,
             author: authorSave,
             verifiers: verifiersSave,
-            viewerLike: viewer?.like || null,
-            viewerLikeLoaded: Boolean(viewer),
-            likePending: false,
-            likeError: "",
           };
           //get embeds async pull out?
           if (embed) {
@@ -2069,31 +1958,32 @@
           const url = `${endpoint}?actor=${encodeURIComponent(
             actorIdentifier
           )}`;
-          const profile = await fetchFrom(url);
+          const profile = await this.fetchGet(url);
           return profile;
         },
         async getReply(parent) {
           const queryParams = new URLSearchParams(parent).toString();
           const url = `https://public.api.bsky.app/xrpc/com.atproto.repo.getRecord?${queryParams}`;
-          const profile = await fetchFrom(url);
+          const profile = await this.fetchGet(url);
           return profile;
         },
         async getPosts(uris) {
           const queryParams = new URLSearchParams({ uris }).toString();
           const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?${queryParams}`;
-          const posts = await fetchFrom(url);
+          const posts = await this.fetchGet(url);
           return posts;
         },
+        //todo add authenticated getActorLikes
         async getPostThread(uri, depth = 6) {
           const queryParams = new URLSearchParams({ uri, depth }).toString();
           const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${queryParams}`;
-          const posts = await fetchFrom(url);
+          const posts = await this.fetchGet(url);
           return posts;
         },
         async getQuotes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
           const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getQuotes?${queryParams}`;
-          const posts = await fetchFrom(url);
+          const posts = await this.fetchGet(url);
           return posts;
         },
         async getMediaBlob($link, did) {
@@ -2105,6 +1995,18 @@
           const url = `${pdsEndpoint}/xrpc/com.atproto.sync.getBlob?${queryParams}`;
           const imageBlob = await fetchFrom(url, "blob");
           return imageBlob;
+        },
+        async getPreferences() {
+          //authenticated request of logged in user
+          const endpoint = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile`;
+          const url = `${endpoint}?actor=${encodeURIComponent(
+            actorIdentifier
+          )}`;
+          const profile = await fetchFrom(url);
+          return profile;
+        },
+        async fetchGet(url) {
+          return this.auth?.session ? authenticatedXrpcRequest(this.auth.session, url, { method: "GET" }) : fetchFrom(url)
         }
       };
     }
@@ -2480,6 +2382,12 @@
       throw new Error("Authenticated request failed.");
     }
 
+    async function getPreferences(session) {
+      const params = new URLSearchParams();
+      const url = `${session.pdsEndpoint}/xrpc/app.bsky.actor.getPreferences`;
+      return authenticatedXrpcRequest(session, url, { method: "GET" });
+    }
+
     async function getAuthenticatedPosts(session, uris) {
       const params = new URLSearchParams();
       uris.forEach((uri) => params.append("uris", uri));
@@ -2487,11 +2395,13 @@
       return authenticatedXrpcRequest(session, url, { method: "GET" });
     }
 
+
+
     async function createLikeRecord(session, subject) {
       if (!subject?.uri || !subject?.cid) {
         throw new Error("Missing the post URI or CID needed to create a like.");
       }
-
+      console.log({ session })
       return authenticatedXrpcRequest(
         session,
         `${session.pdsEndpoint}/xrpc/com.atproto.repo.createRecord`,

@@ -58,7 +58,7 @@
     <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
 
     <!-- Heading -->
-    <div x-cloak x-show="tweets?.length" class="flex items-center justify-between">
+    <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold p-4 text-gray-800 dark:text-gray-200">
         Popular posts
       </h1>
@@ -100,6 +100,18 @@
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
+              </p>
+            </li>
+            <li>
+              <p @click="openLoginModal(); open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <span x-text="auth.session?.handle ? `Logged in as @${auth.session.handle}` : 'Login'"></span>
+              </p>
+            </li>
+            <li x-show="auth.session" x-cloak>
+              <p @click="logout(); open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Log out
               </p>
             </li>
             <li>
@@ -209,7 +221,7 @@
     <div class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
       <!-- Tweets List -->
       <div>
-        <template x-for="tweet in tweets" :key="tweet.id">
+        <template x-for="(tweet, index) in tweets" :key="tweet.cid">
           <!-- start of tweet div -->
           <div class="post">
             <!-- tweet main -->
@@ -567,6 +579,16 @@
         <!-- Like counter -->
         <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
         </p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <button x-show="auth.session" class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
+            :class="tweet.viewerLike
+              ? 'border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-300 dark:hover:bg-pink-900/40'
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'" @click="toggleLike(tweet)">
+            <span x-text="tweet.viewerLike ? 'Unlike' :  'Like'"></span>
+          </button>
+          <p x-show="tweet.likeError" x-cloak class="text-sm text-red-600 dark:text-red-400" x-text="tweet.likeError">
+          </p>
+        </div>
 
         <!-- view replies div -->
         <div>
@@ -626,7 +648,7 @@
         <!-- Replies -->
         <ul x-show="!loadingReplies" class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
           @scroll="maybeLoadMore($el)">
-          <template x-for="tweet in replies" :key="tweet.id">
+          <template x-for="tweet in replies" :key="tweet.cid">
             <li class="py-2">
               <template x-if="tweet.uri === activeReply">
                 <div>
@@ -955,6 +977,52 @@
     </div>
   </div>
 
+  <div x-show="showLoginModal" x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div
+      class="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 text-gray-900 shadow-2xl dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+      @click.away="closeLoginModal()">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold">Login with Bluesky</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Enter your handle to start OAuth.</p>
+        </div>
+        <button
+          class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          @click="closeLoginModal()">&times;</button>
+      </div>
+
+      <form class="space-y-4" @submit.prevent="startLogin()">
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium">Handle</span>
+          <input x-model.trim="auth.handleInput" type="text" inputmode="url" placeholder="your.handle"
+            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-sky-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            :disabled="auth.loading">
+        </label>
+
+        <template x-if="auth.error">
+          <p class="text-sm text-red-600 dark:text-red-400" x-text="auth.error"></p>
+        </template>
+        <template x-if="auth.status">
+          <p class="text-sm text-gray-500 dark:text-gray-400" x-text="auth.status"></p>
+        </template>
+
+        <div class="flex items-center justify-end gap-3">
+          <button type="button" @click="closeLoginModal()"
+            class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            :disabled="auth.loading">
+            Cancel
+          </button>
+          <button type="submit"
+            class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="auth.loading">
+            <span x-text="auth.loading ? 'Redirecting…' : 'Continue'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
     loading...
   </p>
@@ -991,11 +1059,19 @@
         loadingReplies: false,
         loadingMoreReplies: false,
         showModalReplies: false,
+        showLoginModal: false,
         replies: [], // will be set only when modal for one post is open
         rawReplies: [],
         authorThread: [],
         activeReply: "",
         open: false,
+        auth: {
+          handleInput: "",
+          loading: false,
+          error: "",
+          status: "",
+          session: null,
+        },
         menu: {
           sortField: "postorder",
           selectedSort: "default", //"popularity"
@@ -1008,11 +1084,146 @@
           autoPlayVideo: false
         },
         async init() {
+          if (redirectLocalhostToLoopback()) return;
           this.loadMenu()
+          this.loadAuthSession()
           this.addVisibilityListeners();
           this.startWebsocket();
           this.chartIt()
 
+        },
+        async loadAuthSession() {
+          this.auth.session = loadOAuthSession();
+          if (!this.auth.session) return
+          if (this.auth.session?.handle) {
+            this.auth.handleInput = this.auth.session.handle;
+          }
+          const prefs = await getPreferences(this.auth.session);
+          console.log({ prefs })
+          const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2")
+          console.log({ feeds })
+        },
+        openLoginModal() {
+          this.auth.error = "";
+          this.auth.status = "";
+          this.auth.handleInput = this.auth.session?.handle || this.auth.handleInput || "";
+          this.showLoginModal = true;
+        },
+        closeLoginModal() {
+          if (this.auth.loading) return;
+          this.showLoginModal = false;
+          this.auth.error = "";
+          this.auth.status = "";
+        },
+        logout() {
+          clearOAuthSession();
+          this.auth.session = null;
+          this.auth.status = "";
+          this.auth.error = "";
+          this.clearViewerLikes();
+        },
+        async toggleLike(tweet) {
+          if (tweet.likePending) return;
+          tweet.likePending = true;
+          try {
+            const currentLikeUri = tweet.viewerLike || null;
+            const wasLiked = Boolean(currentLikeUri);
+            let createdLike
+            if (wasLiked) {
+              await deleteLikeRecord(this.auth.session, currentLikeUri);
+            } else {
+              createdLike = await createLikeRecord(this.auth.session, {
+                uri: tweet.uri,
+                cid: tweet.cid,
+              });
+            }
+            tweet.likeError = ""
+            tweet.viewerLike = createdLike?.uri || null
+            this.likeTracker[tweet.uri].viewerLike = createdLike?.uri || null
+          } catch (error) {
+            console.error(error);
+            tweet.likeError = error.message || "Unable to update like."
+          } finally {
+            tweet.likePending = false
+          }
+        },
+        async startLogin() {
+          const handle = normalizeHandle(this.auth.handleInput);
+          if (!handle) {
+            this.auth.error = "Enter a valid handle.";
+            return;
+          }
+
+          this.auth.loading = true;
+          this.auth.error = "";
+
+          try {
+            const oauthConfig = getOAuthConfig();
+            this.auth.status = "Resolving handle…";
+            const did = await resolveDidFromHandle(handle);
+            if (!did) throw new Error("Could not resolve that handle.");
+
+            const isValidHandle = await verifyDidHandle(did, handle);
+            if (!isValidHandle) throw new Error("That handle did not verify against its DID document.");
+
+            this.auth.status = "Discovering your server…";
+            const pdsEndpoint = await getPdsEndpointForDid(did);
+            const oauthMetadata = await discoverAuthorizationServerMetadata(pdsEndpoint);
+
+            this.auth.status = "Preparing login…";
+            const state = randomString();
+            const codeVerifier = randomString(64);
+            const codeChallenge = await sha256Base64Url(codeVerifier);
+            const dpopKeyPair = await generateDpopKeyPair();
+
+            const pendingAuth = {
+              state,
+              did,
+              handle,
+              pdsEndpoint,
+              clientId: oauthConfig.clientId,
+              redirectUri: oauthConfig.redirectUri,
+              scope: oauthConfig.scope,
+              appUrl: oauthConfig.appUrl,
+              authServerIssuer: oauthMetadata.issuer,
+              authorizationEndpoint: oauthMetadata.authorization_endpoint,
+              pushedAuthorizationRequestEndpoint: oauthMetadata.pushed_authorization_request_endpoint,
+              tokenEndpoint: oauthMetadata.token_endpoint,
+              codeVerifier,
+              dpopPublicJwk: dpopKeyPair.publicJwk,
+              dpopPrivateJwk: dpopKeyPair.privateJwk,
+              authServerNonce: "",
+              createdAt: Date.now(),
+            };
+
+            this.auth.status = "Contacting authorization server…";
+            const parResponse = await postOAuthForm(
+              oauthMetadata.pushed_authorization_request_endpoint,
+              {
+                client_id: oauthConfig.clientId,
+                redirect_uri: oauthConfig.redirectUri,
+                response_type: "code",
+                scope: oauthConfig.scope,
+                state,
+                code_challenge: codeChallenge,
+                code_challenge_method: "S256",
+                login_hint: handle,
+              },
+              pendingAuth
+            );
+
+            savePendingOAuth(pendingAuth);
+            const authUrl = new URL(oauthMetadata.authorization_endpoint);
+            authUrl.searchParams.set("client_id", oauthConfig.clientId);
+            authUrl.searchParams.set("request_uri", parResponse.request_uri);
+            window.location.assign(authUrl.toString());
+          } catch (error) {
+            console.error(error);
+            this.auth.error = error.message || "Unable to start login.";
+            this.auth.status = "";
+          } finally {
+            this.auth.loading = false;
+          }
         },
         loadMenu() {
           const menuString = localStorage.getItem("menu");
@@ -1220,7 +1431,7 @@
         },
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
-          const allHasAuthorThread = await Promise.allSettled(newTweets.map(tweet=>this.doesPostHaveAuthorThread(tweet.uri)))
+          const allHasAuthorThread = await Promise.allSettled(newTweets.map(tweet => this.doesPostHaveAuthorThread(tweet.uri)))
           console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri, quotePost } = newTweets[index];
@@ -1587,14 +1798,15 @@
           });
         },
         async transformPost(post, postorder, authorSave = {}, verifiersSave = []) {
-
-          const { author, record, hasAuthorThread, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid } = post || {}
+          const { author, record, hasAuthorThread, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
           const { embed, langs } = record;
+          const {like, bookmarked } = viewer || {}
 
           let newTweet = {
             id: cid,
+            cid,
             uri,
             timestamp: format(new Date(record.createdAt), {
               // addSuffix: true,
@@ -1616,7 +1828,8 @@
             langs,
             hasAuthorThread,
             author: authorSave,
-            verifiers: verifiersSave
+            verifiers: verifiersSave,
+            viewerLike: like
           };
           //get embeds async pull out?
           if (embed) {
@@ -1731,43 +1944,58 @@
             return newTweet
           }
         },
+        //todo get the pds endpoint from the auth session
+        getEndpoint(lexiconApi) {
+          const baseUrl = this.auth?.session ? this.auth.session.pdsEndpoint : "https://public.api.bsky.app";
+          return `${baseUrl}/xrpc/${lexiconApi}`
+        },
+        async makeRequest(lexiconApi, requestParams) {
+          const endpoint = this.getEndpoint(lexiconApi);
+          const url = `${endpoint}?${requestParams}`;
+          const res = await this.fetchGet(url);
+          return res;
+        },
         async getServices(actorIdentifier) {
-          const endpoint =
-            "https://public.api.bsky.app/xrpc/app.bsky.labeler.getServices";
-          const url = `${endpoint}?dids=${actorIdentifier}&detailed=true`;
-          const profile = await fetchFrom(url);
+          const queryParams = new URLSearchParams({
+            dids: actorIdentifier,
+            detailed: true,
+          }).toString();
+          const profile = await this.makeRequest(
+            "app.bsky.labeler.getServices",
+            queryParams
+          );
           return profile;
         },
         async getProfile(actorIdentifier) {
-          const endpoint = `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile`;
-          const url = `${endpoint}?actor=${encodeURIComponent(
-            actorIdentifier
-          )}`;
-          const profile = await fetchFrom(url);
-          return profile;
-        },
-        async getReply(parent) {
-          const queryParams = new URLSearchParams(parent).toString();
-          const url = `https://public.api.bsky.app/xrpc/com.atproto.repo.getRecord?${queryParams}`;
-          const profile = await fetchFrom(url);
+          const queryParams = new URLSearchParams({
+            actor: actorIdentifier,
+          }).toString();
+          const profile = await this.makeRequest(
+            "app.bsky.actor.getProfile",
+            queryParams
+          );
           return profile;
         },
         async getPosts(uris) {
           const queryParams = new URLSearchParams({ uris }).toString();
-          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?${queryParams}`;
-          const posts = await fetchFrom(url);
-          return posts;
+          const res = await this.makeRequest("app.bsky.feed.getPosts", queryParams);
+          return res;
         },
+        //todo add authenticated getActorLikes?
         async getPostThread(uri, depth = 6) {
           const queryParams = new URLSearchParams({ uri, depth }).toString();
-          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${queryParams}`;
-          const posts = await fetchFrom(url);
+          const posts = await this.makeRequest(
+            "app.bsky.feed.getPostThread",
+            queryParams
+          );
           return posts;
         },
         async getQuotes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
-          const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getQuotes?${queryParams}`;
-          const posts = await fetchFrom(url);
+          const posts = await this.makeRequest(
+            "app.bsky.feed.getQuotes",
+            queryParams
+          );
           return posts;
         },
         async getMediaBlob($link, did) {
@@ -1775,20 +2003,29 @@
             cid: $link,
             did,
           }).toString();
-          const url = `https://bsky.social/xrpc/com.atproto.sync.getBlob?${queryParams}`;
+          const pdsEndpoint = await getPdsEndpointForDid(did);
+          const url = `${pdsEndpoint}/xrpc/com.atproto.sync.getBlob?${queryParams}`;
           const imageBlob = await fetchFrom(url, "blob");
           return imageBlob;
+        },
+        async fetchGet(url) {
+          return this.auth?.session ? authenticatedXrpcRequest(this.auth.session, url, { method: "GET" }) : fetchFrom(url)
         }
       };
     }
     async function fetchFrom(url, type = "application/json") {
       try {
-        const response = await fetch(url, {
+        const requestOptions = {
           method: "GET",
-          headers: {
+        };
+
+        if (type !== "application/json") {
+          requestOptions.headers = {
             "Content-Type": type,
-          },
-        });
+          };
+        }
+
+        const response = await fetch(url, requestOptions);
 
         if (!response.ok) {
           throw new Error(
@@ -1807,6 +2044,467 @@
         throw error;
       }
     }
+
+    async function resolveDidFromHandle(handle) {
+      try {
+        const dnsTxtLookup = (await googleDnsTxtHandleLookup(handle))
+        if (dnsTxtLookup) return dnsTxtLookup;
+        return wellKnownHandleLookup(handle)
+      } catch (error) {
+        console.error("Failed to fetch DID:", error);
+      }
+    }
+
+    async function wellKnownHandleLookup(handle) {
+      const response = await fetch(`https://${handle}/.well-known/atproto-did`);
+      if (!response.ok) return;
+      const wellknownHandle = (await response.text()).trim();
+      if (wellknownHandle) return wellknownHandle;
+    }
+
+    async function verifyDidHandle(did, handle) {
+      const didDoc = await getDidDoc(did);
+      const claimedHandle = `at://${handle}`;
+      return didDoc?.alsoKnownAs?.includes(claimedHandle);
+    }
+
+    async function getDidDoc(did) {
+      const didDocUrl = did.startsWith("did:web:")
+        ? `https://${did.slice("did:web:".length).replace(/:/g, "/")}/.well-known/did.json`
+        : `https://plc.directory/${encodeURIComponent(did)}`;
+      const didDoc = await fetchFrom(didDocUrl);
+      return didDoc;
+    }
+
+    async function googleDnsTxtHandleLookup(handle) {
+      //there's also a cloudflare one
+      const res = await fetch(
+        `https://dns.google/resolve?name=_atproto.${handle}&type=TXT`
+      );
+      const data = await res.json();
+
+      // TXT records are in data.Answer
+      const txtRecords = (data.Answer || [])
+        .filter(a => a.type === 16) // 16 = TXT
+        .map(a => a.data);
+
+      // console.log(txtRecords);
+      return txtRecords?.[0]?.split(
+        "did="
+      )?.[1]
+    }
+
+    // i dunno, store in a new lexie?
+    const pdsEndpointCache = new Map();
+
+    async function getPdsEndpointForDid(did) {
+      if (pdsEndpointCache.has(did)) {
+        return pdsEndpointCache.get(did);
+      }
+
+      const didDoc = await getDidDoc(did)
+      const pdsEndpoint =
+        didDoc?.service?.find(service => service.id?.endsWith("#atproto_pds"))?.serviceEndpoint ||
+        didDoc?.service?.find(service => service.type === "AtprotoPersonalDataServer")?.serviceEndpoint ||
+        "https://bsky.social";
+
+      pdsEndpointCache.set(did, pdsEndpoint);
+      return pdsEndpoint;
+    }
+
+    const OAUTH_PROD_CLIENT_ID = "https://atomassoni.github.io/bluesky-popular/oauth/client-metadata.json";
+    const OAUTH_PROD_REDIRECT_URI = "https://atomassoni.github.io/bluesky-popular/oauth/callback";
+    const OAUTH_PROD_APP_URL = "https://atomassoni.github.io/bluesky-popular/";
+    const OAUTH_SCOPE = "atproto transition:generic";
+    const OAUTH_PENDING_STORAGE_KEY = "bluesky-popular-oauth-pending";
+    const OAUTH_SESSION_STORAGE_KEY = "bluesky-popular-oauth-session";
+
+    function getOAuthConfig() {
+      if (!isLocalOAuthTesting()) {
+        return {
+          clientId: OAUTH_PROD_CLIENT_ID,
+          redirectUri: OAUTH_PROD_REDIRECT_URI,
+          appUrl: OAUTH_PROD_APP_URL,
+          scope: OAUTH_SCOPE,
+          mode: "production",
+        };
+      }
+
+      const appUrl = getAppBaseUrl();
+      const callbackUrl = new URL("oauth/callback/", appUrl);
+      const localhostClientId = new URL("http://localhost");
+      localhostClientId.searchParams.append("redirect_uri", callbackUrl.toString());
+      localhostClientId.searchParams.set("scope", OAUTH_SCOPE);
+
+      return {
+        clientId: localhostClientId.toString(),
+        redirectUri: callbackUrl.toString(),
+        appUrl,
+        scope: OAUTH_SCOPE,
+        mode: "localhost",
+      };
+    }
+
+    function isLocalOAuthTesting() {
+      const hostname = window.location.hostname;
+      return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+    }
+
+    function redirectLocalhostToLoopback() {
+      if (window.location.hostname !== "localhost") return false;
+      const loopbackUrl = new URL(window.location.href);
+      loopbackUrl.hostname = "127.0.0.1";
+      window.location.replace(loopbackUrl.toString());
+      return true;
+    }
+
+    function getAppBaseUrl() {
+      const baseUrl = window.location.href.endsWith("/")
+        ? new URL(window.location.href)
+        : new URL(".", window.location.href);
+
+      if (isLocalOAuthTesting()) {
+        baseUrl.hostname = "127.0.0.1";
+      }
+
+      return baseUrl.toString();
+    }
+
+    function normalizeHandle(handle) {
+      return (handle || "").trim().replace(/^@/, "").toLowerCase();
+    }
+
+    function randomString(size = 32) {
+      return base64UrlEncode(crypto.getRandomValues(new Uint8Array(size)));
+    }
+
+    function base64UrlEncode(input) {
+      const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+      let binary = "";
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    async function sha256Base64Url(value) {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+      return base64UrlEncode(digest);
+    }
+
+    async function generateDpopKeyPair() {
+      const keyPair = await crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["sign", "verify"]
+      );
+      const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+      const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+      return { publicJwk, privateJwk };
+    }
+
+    async function importDpopKeyPair(publicJwk, privateJwk) {
+      const [publicKey, privateKey] = await Promise.all([
+        crypto.subtle.importKey("jwk", publicJwk, { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"]),
+        crypto.subtle.importKey("jwk", privateJwk, { name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]),
+      ]);
+      return { publicKey, privateKey };
+    }
+
+    async function createDpopProof({ url, method, nonce, accessToken, publicJwk, privateJwk }) {
+      const keyPair = await importDpopKeyPair(publicJwk, privateJwk);
+      const header = {
+        typ: "dpop+jwt",
+        alg: "ES256",
+        jwk: {
+          kty: publicJwk.kty,
+          crv: publicJwk.crv,
+          x: publicJwk.x,
+          y: publicJwk.y,
+        },
+      };
+      const payload = {
+        jti: randomString(24),
+        htm: method.toUpperCase(),
+        htu: url,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 300,
+      };
+
+      if (nonce) payload.nonce = nonce;
+      if (accessToken) payload.ath = await sha256Base64Url(accessToken);
+
+      const encodedHeader = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
+      const encodedPayload = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+      const signingInput = `${encodedHeader}.${encodedPayload}`;
+      const signature = await crypto.subtle.sign(
+        { name: "ECDSA", hash: "SHA-256" },
+        keyPair.privateKey,
+        new TextEncoder().encode(signingInput)
+      );
+      return `${signingInput}.${base64UrlEncode(signature)}`;
+    }
+
+    async function oauthRequest(url, options, authState) {
+      let nonce = authState.authServerNonce || "";
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const dpop = await createDpopProof({
+          url,
+          method: options.method || "POST",
+          nonce,
+          publicJwk: authState.dpopPublicJwk,
+          privateJwk: authState.dpopPrivateJwk,
+        });
+
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            DPoP: dpop,
+          },
+        });
+
+        const nextNonce = response.headers.get("DPoP-Nonce");
+        if (nextNonce) authState.authServerNonce = nextNonce;
+
+        if (response.ok) {
+          return response.json();
+        }
+
+        const errorBody = await response.json().catch(() => ({}));
+        if (errorBody?.error === "use_dpop_nonce" && nextNonce && attempt === 0) {
+          nonce = nextNonce;
+          continue;
+        }
+
+        throw new Error(errorBody?.error_description || errorBody?.error || "OAuth request failed.");
+      }
+
+      throw new Error("OAuth request failed.");
+    }
+
+    async function postOAuthForm(url, params, authState) {
+      return oauthRequest(url, {
+        method: "POST",
+        body: new URLSearchParams(params).toString(),
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }, authState);
+    }
+
+    async function refreshOAuthSession(session) {
+      if (!session?.refreshToken) {
+        throw new Error("This Bluesky session can no longer be refreshed.");
+      }
+
+      const tokenResponse = await postOAuthForm(
+        session.tokenEndpoint,
+        {
+          grant_type: "refresh_token",
+          refresh_token: session.refreshToken,
+          client_id: session.clientId || getOAuthConfig().clientId,
+        },
+        session
+      );
+
+      if (tokenResponse.sub && session.did && tokenResponse.sub !== session.did) {
+        throw new Error("Refreshed session DID did not match the logged-in user.");
+      }
+
+      const nextSession = {
+        ...session,
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || session.refreshToken,
+        scope: tokenResponse.scope || session.scope,
+        updatedAt: Date.now(),
+      };
+      saveOAuthSession(nextSession);
+      return nextSession;
+    }
+
+    async function authenticatedXrpcRequest(session, url, options = {}, allowRefresh = true) {
+      let nonce = session.resourceServerNonce || "";
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const dpop = await createDpopProof({
+          url,
+          method: options.method || "GET",
+          nonce,
+          accessToken: session.accessToken,
+          publicJwk: session.dpopPublicJwk,
+          privateJwk: session.dpopPrivateJwk,
+        });
+
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            Authorization: `DPoP ${session.accessToken}`,
+            DPoP: dpop,
+          },
+        });
+
+        const nextNonce = response.headers.get("DPoP-Nonce");
+        if (nextNonce) {
+          session.resourceServerNonce = nextNonce;
+          saveOAuthSession(session);
+        }
+
+        if (response.ok) {
+          const contentType = response.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            return response.json();
+          }
+          return null;
+        }
+
+        const errorBody = await response.json().catch(() => ({}));
+        if (errorBody?.error === "use_dpop_nonce" && nextNonce && attempt === 0) {
+          nonce = nextNonce;
+          continue;
+        }
+
+        const shouldRefresh =
+          allowRefresh &&
+          response.status === 401 &&
+          session.refreshToken &&
+          ["expired_token", "invalid_token", "unauthorized"].includes(errorBody?.error);
+
+        if (shouldRefresh) {
+          const refreshedSession = await refreshOAuthSession(session);
+          return authenticatedXrpcRequest(refreshedSession, url, options, false);
+        }
+
+        throw new Error(
+          errorBody?.error_description ||
+          errorBody?.message ||
+          errorBody?.error ||
+          `Request failed with ${response.status}.`
+        );
+      }
+
+      throw new Error("Authenticated request failed.");
+    }
+
+    async function getPreferences(session) {
+      const params = new URLSearchParams();
+      const url = `${session.pdsEndpoint}/xrpc/app.bsky.actor.getPreferences`;
+      return authenticatedXrpcRequest(session, url, { method: "GET" });
+    }
+
+    async function createLikeRecord(session, subject) {
+      if (!subject?.uri || !subject?.cid) {
+        throw new Error("Missing the post URI or CID needed to create a like.");
+      }
+      console.log({ session })
+      return authenticatedXrpcRequest(
+        session,
+        `${session.pdsEndpoint}/xrpc/com.atproto.repo.createRecord`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            repo: session.did,
+            collection: "app.bsky.feed.like",
+            record: {
+              $type: "app.bsky.feed.like",
+              subject: {
+                uri: subject.uri,
+                cid: subject.cid,
+              },
+              createdAt: new Date().toISOString(),
+            },
+          }),
+        }
+      );
+    }
+
+    async function deleteLikeRecord(session, likeUri) {
+      const parsed = parseAtUri(likeUri);
+      if (!parsed) {
+        throw new Error("Could not parse the like record URI.");
+      }
+
+      return authenticatedXrpcRequest(
+        session,
+        `${session.pdsEndpoint}/xrpc/com.atproto.repo.deleteRecord`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            repo: parsed.repo,
+            collection: parsed.collection,
+            rkey: parsed.rkey,
+          }),
+        }
+      );
+    }
+
+    function parseAtUri(uri) {
+      if (!uri?.startsWith("at://")) return null;
+      const [repo, collection, rkey] = uri.slice(5).split("/");
+      if (!repo || !collection || !rkey) return null;
+      return { repo, collection, rkey };
+    }
+
+    async function discoverAuthorizationServerMetadata(pdsEndpoint) {
+      const protectedResourceUrl = `${new URL(pdsEndpoint).origin}/.well-known/oauth-protected-resource`;
+      const protectedResource = await fetchFrom(protectedResourceUrl);
+      const authServer = protectedResource?.authorization_servers?.[0] || new URL(pdsEndpoint).origin;
+      const metadata = await fetchFrom(`${authServer}/.well-known/oauth-authorization-server`);
+      if (!metadata?.issuer || !metadata?.authorization_endpoint || !metadata?.token_endpoint || !metadata?.pushed_authorization_request_endpoint) {
+        throw new Error("OAuth server metadata is incomplete.");
+      }
+
+      const scopes = Array.isArray(metadata.scopes_supported)
+        ? metadata.scopes_supported
+        : String(metadata.scopes_supported || "").split(/\s+/);
+      if (!scopes.includes("atproto")) {
+        throw new Error("That server does not advertise atproto OAuth support.");
+      }
+
+      return metadata;
+    }
+
+    function savePendingOAuth(pendingAuth) {
+      localStorage.setItem(OAUTH_PENDING_STORAGE_KEY, JSON.stringify(pendingAuth));
+    }
+
+    function saveOAuthSession(session) {
+      localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+    }
+
+    function loadOAuthSession() {
+      const raw = localStorage.getItem(OAUTH_SESSION_STORAGE_KEY);
+      if (!raw) return null;
+
+      try {
+        return JSON.parse(raw);
+      } catch (error) {
+        console.error(error);
+        localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY);
+        return null;
+      }
+    }
+
+    function clearOAuthSession() {
+      localStorage.removeItem(OAUTH_PENDING_STORAGE_KEY);
+      localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY);
+    }
+
+    function chunkArray(values, size) {
+      const chunks = [];
+      for (let index = 0; index < values.length; index += size) {
+        chunks.push(values.slice(index, index + size));
+      }
+      return chunks;
+    }
+
+
     function sortPosts(a, b, sortField) {
       return sortField === 'postorder'
         ? a[sortField] - b[sortField]

@@ -52,7 +52,9 @@
 </head>
 
 <body class="bg-white dark:bg-gray-900 min-h-screen flex items-center justify-center">
-  <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())" id="scroll-container"
+  <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())"
+    x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt)"
+    id="scroll-container"
     class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200" @scroll.window.debounce.300ms="checkScroll"
     class="min-h-screen">
     <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
@@ -1079,7 +1081,7 @@
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
     <div @click="activeImageAlt = ''" class="absolute inset-0"></div>
     <div
-      class="relative z-10 w-full max-w-md rounded-xl bg-white p-5 text-gray-900 shadow-xl dark:bg-gray-800 dark:text-gray-100">
+      class="relative z-10 flex max-h-[80vh] w-full max-w-md flex-col rounded-xl bg-white p-5 text-gray-900 shadow-xl dark:bg-gray-800 dark:text-gray-100">
       <div class="flex items-start justify-between gap-4">
         <h2 class="text-lg font-semibold">Alt Text</h2>
         <button type="button" @click="activeImageAlt = ''"
@@ -1088,7 +1090,9 @@
           Close
         </button>
       </div>
-      <p class="mt-4 whitespace-pre-wrap text-sm leading-6" x-text="activeImageAlt"></p>
+      <div class="mt-4 overflow-y-auto">
+        <p class="whitespace-pre-wrap text-sm leading-6" x-text="activeImageAlt"></p>
+      </div>
     </div>
   </div>
 

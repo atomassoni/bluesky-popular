@@ -54,9 +54,8 @@
 <body class="bg-white dark:bg-gray-900 min-h-screen flex items-center justify-center">
   <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())"
     x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt)"
-    id="scroll-container"
-    class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200" @scroll.window.debounce.300ms="checkScroll"
-    class="min-h-screen">
+    id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
+    @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
 
     <!-- Heading -->
@@ -104,18 +103,7 @@
                 </svg>
               </p>
             </li>
-            <li>
-              <p @click="openLoginModal(); open = false"
-                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                <span x-text="auth.session?.handle ? `Logged in as @${auth.session.handle}` : 'Login'"></span>
-              </p>
-            </li>
-            <li x-show="auth.session" x-cloak>
-              <p @click="logout(); open = false"
-                class="flex items-center justify-between px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">
-                Log out
-              </p>
-            </li>
+
             <li>
               <p @click="resetPostCache(); open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -128,6 +116,18 @@
                 :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showChart }">
                 Show likes graph
                 <svg x-show="menu.showChart" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
+            <li>
+              <p @click="menu.showDots = !menu.showDots; open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showDots }">
+                Keep watching dots
+                <svg x-show="menu.showDots" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -199,33 +199,46 @@
                 </svg>
               </p>
             </li>
+            <li>
+              <p @click="openLoginModal(); open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <span x-text="auth.session?.handle ? `Logged in as @${auth.session.handle}` : 'Login'"></span>
+              </p>
+            </li>
+            <li x-show="auth.session" x-cloak>
+              <p @click="logout(); open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Log out
+              </p>
+            </li>
           </ul>
         </div>
       </div>
     </div>
 
 
-    <h1 x-cloak x-show="!tweets?.length"
+    <h1 x-cloak x-show="!tweets?.length || menu.showDots"
       class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 animate-pulse">
 
-      <div class="mt-3 flex flex-wrap items-end gap-x-1.5 gap-y-3 pb-2">
-        <template x-for="dot in dots" :key="dot.uri">
-          <div class="flex flex-col-reverse items-center gap-0.5" :title="`${dot.likeCount} likes`"
+      <div class="mt-3 flex flex-wrap items-end gap-x-1.5 gap-y-3 pb-2" x-on:click.away="resetTweets">
+        <template x-for="dot in dots" :key="dot.link">
+          <div class="flex cursor-pointer flex-col-reverse items-center gap-0.5" :title="`${dot.likeCount} likes`"
             :aria-label="`${dot.likeCount} likes`">
-            <template x-for="count in dot.likeCount" :key="`${dot.cid}-${count}`">
-              <span class="h-1.5 w-1.5 rounded-full bg-sky-500 dark:bg-sky-400"></span>
+            <template x-for="count in dot.likeCount" :key="`${dot.link}-${count}`">
+              <span class="h-1.5 w-1.5 rounded-full"
+                :class="dot.likeCount > 9 ? 'bg-yellow-400 dark:bg-yellow-300' : 'bg-sky-500 dark:bg-sky-400'"></span>
             </template>
           </div>
         </template>
       </div>
     </h1>
 
-    <div class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
+    <div x-show="!menu.showDots" class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
       <!-- Tweets List -->
       <div>
         <template x-for="(tweet, index) in tweets" :key="tweet.cid">
           <!-- start of tweet div -->
-          <div class="post">
+          <div class="post" style="overflow-wrap: break-word;">
             <!-- tweet main -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
               <!-- Profile Card Component -->
@@ -454,7 +467,7 @@
 
               <!-- Images -->
               <div class="mt-2" x-show="tweet.images?.length > 0">
-                <template x-for="image in tweet.images" :key="image">
+                <template x-for="image in tweet.images" :key="image.src">
                   <div class="relative mt-2">
                     <a :href="tweet.postUrl" target="_blank" class="block">
                       <img :src="image.src" :alt="image.alt"
@@ -527,7 +540,7 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
                       x-text="tweet.quotePost.content || 'Post not available'"></p>
                     <div class="mt-2 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
-                      <template x-for="image in tweet.quotePost.images" :key="image">
+                      <template x-for="image in tweet.quotePost.images" :key="image.src">
                         <div class="relative mt-2">
 
                           <img :src="image.src" :alt="image.alt"
@@ -705,7 +718,7 @@
                     x-text="tweet.content"></a>
 
                   <div class="mt-1.5" x-show="tweet.images?.length > 0">
-                    <template x-for="image in tweet.images" :key="image">
+                    <template x-for="image in tweet.images" :key="image.src">
                       <div class="relative mt-2">
                         <a :href="tweet.postUrl" target="_blank" class="block mt-2">
                           <img :src="image.src" :alt="image.alt"
@@ -773,7 +786,7 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
                           x-text="tweet.quotePost.content || 'Post not available'"></p>
                         <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
-                          <template x-for="image in tweet.quotePost.images" :key="image">
+                          <template x-for="image in tweet.quotePost.images" :key="image.src">
                             <div class="relative mt-2">
                               <img :src="image.src" :alt="image.alt"
                                 class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
@@ -858,7 +871,7 @@
                       x-text="tweet.content"></a>
 
                     <div class="mt-1.5" x-show="tweet.images?.length > 0">
-                      <template x-for="image in tweet.images" :key="image">
+                      <template x-for="image in tweet.images" :key="image.src">
                         <div class="relative mt-2">
 
                           <a :href="tweet.postUrl" target="_blank" class="block mt-2">
@@ -925,7 +938,7 @@
                           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
                             x-text="tweet.quotePost.content || 'Post not available'"></p>
                           <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
-                            <template x-for="image in tweet.quotePost.images" :key="image">
+                            <template x-for="image in tweet.quotePost.images" :key="image.src">
                               <div class="relative mt-2">
 
                                 <img :src="image.src" :alt="image.alt"
@@ -1155,7 +1168,8 @@
           showLabeled: false,
           showOnlyAuthorProfile: false,
           noBigAccounts: false,
-          autoPlayVideo: false
+          autoPlayVideo: false,
+          showDots: false
         },
         async init() {
           if (redirectLocalhostToLoopback()) return;
@@ -1650,6 +1664,66 @@
           const key = 'show_' + label;
           this.menu[key] = !this.isLabelShown(label);
         },
+        async getPostExpanded(cid, uri) {
+          const [_, __, repo, collection, rkey] = uri.split("/");
+          let postSave = await db.posts.get({ cid })
+          if (postSave?.viewCount > 0) {
+            //console.log("already seen this", postSave);
+            //todo delete assets?
+            return;
+          }
+          if (!postSave) {
+            postSave = (await this.getPosts(uri))?.posts[0];
+            db.posts.add({ ...postSave, refreshTime: Date.now() })
+          }
+
+          const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+          // console.log({ labels })
+          // if (!record) return;
+          if (labels.length) {
+            for (const { val } of labels) {
+              ///this will count every like 
+              if (!this.labelTracker[val]) {
+                this.labelTracker[val] = 0;
+                this.labels.push(val)
+              }
+              this.labelTracker[val]++;
+            }
+            const showPost = labels.every(label => this.isLabelShown(label.val));
+            if (!showPost) return
+          }
+          const { handle, avatar, displayName } = author || {};
+          let authorSave = await db.authors.get({ handle })
+          //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
+          if (!authorSave) { //refresh time over 24 hours ago
+            const authorProfile = await this.getProfile(repo);
+            // console.log({ authorProfile })
+            db.authors.add({ ...authorProfile, refreshTime: Date.now() })
+            authorSave = { ...authorProfile, refreshTime: Date.now() }
+          }
+          const ratio = authorSave.followersCount / totalLikeCount
+          // console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
+          if (this.menu.noBigAccounts && ratio > 25) return;
+
+          let verifiersSave = []
+          for (const verification of authorSave.verification?.verifications || []) {
+            const { issuer } = verification
+            const verifier = await db.verifiers.get({ did: issuer });
+            if (verifier) {
+              verifiersSave.push(verifier);
+            } else {
+              const newVerifier = await this.getProfile(issuer);
+              db.verifiers.add({ ...newVerifier, refreshTime: Date.now() })
+              verifiersSave.push(newVerifier);
+            }
+          }
+
+
+          const newTweet = await this.transformPost(postSave, this.postorder, authorSave, verifiersSave)
+          return newTweet;
+
+
+        },
         startWebsocket(q) {
           const queryString = window.location.search;
           const urlParams = new URLSearchParams(queryString);
@@ -1688,7 +1762,6 @@
 
             const { operation, cid, record, rkey, collection } = commit || {};
 
-
             if (operation != "create") {
               return;
             }
@@ -1704,6 +1777,9 @@
             if (!this.likeTracker[uri]?.timesUs?.length) {
               this.likeTracker[uri] = { likeCount: 0, timesUs: [] };
             }
+            this.likeTracker[uri].cid = likeCid;
+            this.likeTracker[uri].link = uri;
+
             this.likeTracker[uri].timesUs.push(time_us);
             this.likeTracker[uri].totalLikeCount ? this.likeTracker[uri].totalLikeCount++ : 1;
 
@@ -1718,8 +1794,9 @@
             }
             this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(1) })
-            if (this.counter % 15 == 0 && !this.tweets?.length) {
-              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 2)
+            if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
+              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 2);
+              // console.log({ dots })
               this.dots = dots;
             }
             if (
@@ -1772,62 +1849,8 @@
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == this.postThreshold) {
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
-
-                let postSave = await db.posts.get({ cid: likeCid })
-                if (postSave?.viewCount > 0) {
-                  //console.log("already seen this", postSave);
-                  //todo should i delete the assets? no need to keep in memory, it won't be shown again
-                  return;
-                }
-                if (!postSave) {
-                  postSave = (await this.getPosts(uri))?.posts[0];
-                  db.posts.add({ ...postSave, refreshTime: Date.now() })
-                }
-
-                const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
-                // console.log({ labels })
-                // if (!record) return;
-
-                const { handle, avatar, displayName } = author || {};
-                let authorSave = await db.authors.get({ handle })
-                // // console.log({ authorSave })
-                //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
-                if (!authorSave) { //refresh time over 24 hours ago
-                  const authorProfile = await this.getProfile(repo);
-                  // console.log({ authorProfile })
-                  db.authors.add({ ...authorProfile, refreshTime: Date.now() })
-                  authorSave = { ...authorProfile, refreshTime: Date.now() }
-                }
-                const ratio = authorSave.followersCount / totalLikeCount
-                // console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
-                if (this.menu.noBigAccounts && ratio > 25) return;
-
-                let verifiersSave = []
-                for (const verification of authorSave.verification?.verifications || []) {
-                  const { issuer } = verification
-                  const verifier = await db.verifiers.get({ did: issuer });
-                  if (verifier) {
-                    verifiersSave.push(verifier);
-                  } else {
-                    const newVerifier = await this.getProfile(issuer);
-                    db.verifiers.add({ ...newVerifier, refreshTime: Date.now() })
-                    verifiersSave.push(newVerifier);
-                  }
-                }
-
-                if (labels.length) {
-                  for (const { val } of labels) {
-                    ///this will count every like 
-                    if (!this.labelTracker[val]) {
-                      this.labelTracker[val] = 0;
-                      this.labels.push(val)
-                    }
-                    this.labelTracker[val]++;
-                  }
-                  const showPost = labels.every(label => this.isLabelShown(label.val));
-                  if (!showPost) return
-                }
-                const newTweet = await this.transformPost(postSave, this.postorder, authorSave, verifiersSave)
+                const newTweet = await this.getPostExpanded(likeCid, uri);
+                if (!newTweet) return;
                 this.postorder++;
                 // if (newTweet.quotePost) // console.log({ newTweet })
                 if (this.likeTracker[uri]) {

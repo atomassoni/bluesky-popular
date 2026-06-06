@@ -1173,6 +1173,11 @@
         },
         async init() {
           if (redirectLocalhostToLoopback()) return;
+          window.addEventListener("bluesky-auth-expired", (event) => {
+            this.auth.session = null;
+            this.openLoginModal();
+            this.auth.error = event.detail?.message || "Your saved Bluesky login expired. Please log in again.";
+          });
           this.loadMenu()
           this.loadAuthSession()
           this.addVisibilityListeners();
@@ -1186,10 +1191,15 @@
           if (this.auth.session?.handle) {
             this.auth.handleInput = this.auth.session.handle;
           }
-          const prefs = await getPreferences(this.auth.session);
-          console.log({ prefs })
-          const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2")
-          console.log({ feeds })
+          try {
+            const prefs = await getPreferences(this.auth.session);
+            console.log({ prefs })
+            const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2")
+            console.log({ feeds })
+          } catch (error) {
+            this.auth.session = null;
+            this.auth.error = error.message || "Unable to restore your Bluesky login.";
+          }
         },
         openLoginModal() {
           this.auth.error = "";
@@ -2397,15 +2407,28 @@
         throw new Error("This Bluesky session can no longer be refreshed.");
       }
 
-      const tokenResponse = await postOAuthForm(
-        session.tokenEndpoint,
-        {
-          grant_type: "refresh_token",
-          refresh_token: session.refreshToken,
-          client_id: session.clientId || getOAuthConfig().clientId,
-        },
-        session
-      );
+      let tokenResponse;
+      try {
+        tokenResponse = await postOAuthForm(
+          session.tokenEndpoint,
+          {
+            grant_type: "refresh_token",
+            refresh_token: session.refreshToken,
+            client_id: session.clientId || getOAuthConfig().clientId,
+          },
+          session
+        );
+      } catch (error) {
+        if (error?.message === "Invalid refresh token") {
+          clearOAuthSession();
+          const message = "Your saved Bluesky login expired. Please log in again.";
+          window.dispatchEvent(new CustomEvent("bluesky-auth-expired", {
+            detail: { message },
+          }));
+          throw new Error(message);
+        }
+        throw error;
+      }
 
       if (tokenResponse.sub && session.did && tokenResponse.sub !== session.did) {
         throw new Error("Refreshed session DID did not match the logged-in user.");

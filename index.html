@@ -401,22 +401,26 @@
 
               <!-- Parent Tweet -->
               <template x-if="tweet.parent">
-                <div
-                  class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-3 flex items-start">
+                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-1.5">
                   <!-- Parent Tweet Avatar -->
-                  <img :src="tweet.parent.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
-                    class="w-6 h-6 rounded-full mr-3" />
-                  <!-- Parent Tweet Content -->
-                  <div class="flex-1">
-                    <p class="font-semibold text-gray-600 dark:text-gray-300">
-                      <span x-text="tweet.parent.userName || 'Anonymous'"></span>
-                      <span class="text-sm text-gray-500 dark:text-gray-400"
-                        x-text="'@' + (tweet.parent.userHandle || 'anonymous')"></span>
-                    </p>
+                  <div class="flex items-center">
+                    <img :src="tweet.parent.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                      class="w-6 h-6 rounded-full mr-3" />
+                    <!-- Parent Tweet Content -->
+                    <div class="flex-1 min-w-0">
+                      <p class="font-semibold text-gray-600 dark:text-gray-300">
+                        <span x-text="tweet.parent.userName || 'Anonymous'"></span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400"
+                          x-text="'@' + (tweet.parent.userHandle || 'anonymous')"></span>
+                      </p>
+                    </div>
+                  </div>
+                  <div class="mt-1">
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1"
                       x-text="tweet.parent.content || 'Parent tweet not available'"></p>
                   </div>
                 </div>
+
               </template>
 
               <!-- Main Tweet -->
@@ -522,7 +526,8 @@
 
               <!-- Quote Tweet -->
               <template x-if="tweet.quotePost">
-                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2">
+                <div @click="loadReplies(tweet.quotePost.uri); showModalReplies = true"
+                  class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-2">
                   <div class="flex items-center"> <!-- Quote Tweet Avatar -->
                     <img
                       :src="tweet.quotePost.author.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 fill=%22%23e5e7eb%22/%3E%3Ccircle cx=%2225%22 cy=%2219%22 r=%229%22 fill=%22%239ca3af%22/%3E%3Cpath d=%22M9 45c2.5-8 9-12 16-12s13.5 4 16 12%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%226%22 stroke-linecap=%22round%22/%3E%3C/svg%3E'"
@@ -579,7 +584,8 @@
                               <h3 class="text-lg font-semibold text-gray-600 dark:text-gray-200 hover:underline"
                                 x-text="tweet.quotePost.external.title"></h3>
                               <p class="text-gray-600 dark:text-gray-300 mt-2"
-                                x-text="tweet.quotePost.external.description"></p>
+                                x-text="tweet.quotePost.external.description">
+                              </p>
                             </a>
                             <a :href="tweet.quotePost.external.uri" target="_blank"
                               class="text-sm text-gray-500 dark:text-gray-400 hover:underline mt-4 inline-block">
@@ -773,7 +779,7 @@
                   </template>
 
                   <template x-if="tweet.quotePost">
-                    <div
+                    <div @click="loadReplies(tweet.quotePost.uri); showModalReplies = true"
                       class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
                       <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
                         class="w-6 h-6 rounded-full mr-3" />
@@ -925,7 +931,7 @@
                     </template>
 
                     <template x-if="tweet.quotePost">
-                      <div
+                      <div @click="loadReplies(tweet.quotePost.uri); showModalReplies = true"
                         class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
                         <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
                           class="w-6 h-6 rounded-full mr-3" />
@@ -1678,7 +1684,8 @@
           const [_, __, repo, collection, rkey] = uri.split("/");
           let postSave = await db.posts.get({ cid })
           if (postSave?.viewCount > 0) {
-            //console.log("already seen this", postSave);
+
+            // console.log("already seen this", postSave);
             //todo delete assets?
             return;
           }
@@ -1908,7 +1915,7 @@
           const { author, record, hasAuthorThread, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
-          const { embed, langs } = record;
+          const { embed, langs, reply } = record;
           const { like, bookmarked } = viewer || {}
 
           let newTweet = {
@@ -1938,6 +1945,15 @@
             verifiers: verifiersSave,
             viewerLike: like
           };
+          const { parent, root } = reply || {};
+          if (parent?.uri) {
+            console.log({ parent })
+            const [_, __, repo, collection, rkey] = uri.split("/");
+
+            newTweet = await this.loadParent(newTweet, parent.uri)
+          }
+
+
           //get embeds async pull out?
           if (embed) {
             newTweet = await this.loadEmbedDetails(newTweet, embed, repo);
@@ -1951,6 +1967,11 @@
           if (replies?.length) {
             newTweet.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
           }
+          return newTweet;
+        },
+        async loadParent(newTweet, parentUri) {
+          const parent = (await this.getPosts(parentUri))?.posts[0];
+          newTweet.parent = await this.transformPost(parent, 0, parent.author, parent.verifiers)
           return newTweet;
         },
         async loadEmbedDetails(newTweet, embed, repo) {
@@ -2221,6 +2242,9 @@
       pdsEndpointCache.set(did, pdsEndpoint);
       return pdsEndpoint;
     }
+    // -----------------------------
+    // OAuth constants
+    // -----------------------------
 
     const OAUTH_PROD_CLIENT_ID = "https://atomassoni.github.io/bluesky-popular/oauth/client-metadata.json";
     const OAUTH_PROD_REDIRECT_URI = "https://atomassoni.github.io/bluesky-popular/oauth/callback";
@@ -2229,20 +2253,33 @@
     const OAUTH_PENDING_STORAGE_KEY = "bluesky-popular-oauth-pending";
     const OAUTH_SESSION_STORAGE_KEY = "bluesky-popular-oauth-session";
 
+    // -----------------------------
+    // OAuth config / environment
+    // -----------------------------
+
     function getOAuthConfig() {
-      if (!isLocalOAuthTesting()) {
-        return {
-          clientId: OAUTH_PROD_CLIENT_ID,
-          redirectUri: OAUTH_PROD_REDIRECT_URI,
-          appUrl: OAUTH_PROD_APP_URL,
-          scope: OAUTH_SCOPE,
-          mode: "production",
-        };
+      if (isLocalOAuthTesting()) {
+        return getLocalOAuthConfig();
       }
 
+      return getProductionOAuthConfig();
+    }
+
+    function getProductionOAuthConfig() {
+      return {
+        clientId: OAUTH_PROD_CLIENT_ID,
+        redirectUri: OAUTH_PROD_REDIRECT_URI,
+        appUrl: OAUTH_PROD_APP_URL,
+        scope: OAUTH_SCOPE,
+        mode: "production",
+      };
+    }
+
+    function getLocalOAuthConfig() {
       const appUrl = getAppBaseUrl();
       const callbackUrl = new URL("oauth/callback/", appUrl);
       const localhostClientId = new URL("http://localhost");
+
       localhostClientId.searchParams.append("redirect_uri", callbackUrl.toString());
       localhostClientId.searchParams.set("scope", OAUTH_SCOPE);
 
@@ -2256,12 +2293,12 @@
     }
 
     function isLocalOAuthTesting() {
-      const hostname = window.location.hostname;
-      return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+      return ["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname);
     }
 
     function redirectLocalhostToLoopback() {
       if (window.location.hostname !== "localhost") return false;
+
       const loopbackUrl = new URL(window.location.href);
       loopbackUrl.hostname = "127.0.0.1";
       window.location.replace(loopbackUrl.toString());
@@ -2280,9 +2317,47 @@
       return baseUrl.toString();
     }
 
+    // -----------------------------
+    // General helpers
+    // -----------------------------
+
     function normalizeHandle(handle) {
       return (handle || "").trim().replace(/^@/, "").toLowerCase();
     }
+
+    async function safeJson(response) {
+      return response.json().catch(() => ({}));
+    }
+
+    async function parseResponseBody(response) {
+      const contentType = response.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        return response.json();
+      }
+
+      return null;
+    }
+
+    function getErrorMessage(errorBody, fallbackMessage) {
+      return (
+        errorBody?.error_description ||
+        errorBody?.message ||
+        errorBody?.error ||
+        fallbackMessage
+      );
+    }
+
+    function createHttpError(response, errorBody, fallbackMessage) {
+      const error = new Error(getErrorMessage(errorBody, fallbackMessage));
+      error.status = response.status;
+      error.body = errorBody;
+      return error;
+    }
+
+    // -----------------------------
+    // Crypto helpers
+    // -----------------------------
 
     function randomString(size = 32) {
       return base64UrlEncode(crypto.getRandomValues(new Uint8Array(size)));
@@ -2291,14 +2366,26 @@
     function base64UrlEncode(input) {
       const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
       let binary = "";
-      for (const byte of bytes) binary += String.fromCharCode(byte);
-      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+
+      return btoa(binary)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
     }
 
     async function sha256Base64Url(value) {
-      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+      const bytes = new TextEncoder().encode(value);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
       return base64UrlEncode(digest);
     }
+
+    // -----------------------------
+    // DPoP key/proof helpers
+    // -----------------------------
 
     async function generateDpopKeyPair() {
       const keyPair = await crypto.subtle.generateKey(
@@ -2306,22 +2393,53 @@
         true,
         ["sign", "verify"]
       );
-      const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-      const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+
+      const [publicJwk, privateJwk] = await Promise.all([
+        crypto.subtle.exportKey("jwk", keyPair.publicKey),
+        crypto.subtle.exportKey("jwk", keyPair.privateKey),
+      ]);
+
       return { publicJwk, privateJwk };
     }
 
     async function importDpopKeyPair(publicJwk, privateJwk) {
+      const algorithm = { name: "ECDSA", namedCurve: "P-256" };
+
       const [publicKey, privateKey] = await Promise.all([
-        crypto.subtle.importKey("jwk", publicJwk, { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"]),
-        crypto.subtle.importKey("jwk", privateJwk, { name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]),
+        crypto.subtle.importKey("jwk", publicJwk, algorithm, true, ["verify"]),
+        crypto.subtle.importKey("jwk", privateJwk, algorithm, true, ["sign"]),
       ]);
+
       return { publicKey, privateKey };
     }
 
     async function createDpopProof({ url, method, nonce, accessToken, publicJwk, privateJwk }) {
-      const keyPair = await importDpopKeyPair(publicJwk, privateJwk);
-      const header = {
+      const { privateKey } = await importDpopKeyPair(publicJwk, privateJwk);
+      const signingInput = await createDpopSigningInput({
+        url,
+        method,
+        nonce,
+        accessToken,
+        publicJwk,
+      });
+
+      const signature = await crypto.subtle.sign(
+        { name: "ECDSA", hash: "SHA-256" },
+        privateKey,
+        new TextEncoder().encode(signingInput)
+      );
+
+      return `${signingInput}.${base64UrlEncode(signature)}`;
+    }
+
+    async function createDpopSigningInput({ url, method, nonce, accessToken, publicJwk }) {
+      const header = createDpopHeader(publicJwk);
+      const payload = await createDpopPayload({ url, method, nonce, accessToken });
+      return `${encodeJwtPart(header)}.${encodeJwtPart(payload)}`;
+    }
+
+    function createDpopHeader(publicJwk) {
+      return {
         typ: "dpop+jwt",
         alg: "ES256",
         jwk: {
@@ -2331,109 +2449,176 @@
           y: publicJwk.y,
         },
       };
+    }
+
+    async function createDpopPayload({ url, method, nonce, accessToken }) {
+      const issuedAt = Math.floor(Date.now() / 1000);
       const payload = {
         jti: randomString(24),
         htm: method.toUpperCase(),
         htu: url,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 300,
+        iat: issuedAt,
+        exp: issuedAt + 300,
       };
 
       if (nonce) payload.nonce = nonce;
       if (accessToken) payload.ath = await sha256Base64Url(accessToken);
 
-      const encodedHeader = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
-      const encodedPayload = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
-      const signingInput = `${encodedHeader}.${encodedPayload}`;
-      const signature = await crypto.subtle.sign(
-        { name: "ECDSA", hash: "SHA-256" },
-        keyPair.privateKey,
-        new TextEncoder().encode(signingInput)
-      );
-      return `${signingInput}.${base64UrlEncode(signature)}`;
+      return payload;
     }
 
-    async function oauthRequest(url, options, authState) {
-      let nonce = authState.authServerNonce || "";
+    function encodeJwtPart(value) {
+      const json = JSON.stringify(value);
+      const bytes = new TextEncoder().encode(json);
+      return base64UrlEncode(bytes);
+    }
+
+    // -----------------------------
+    // DPoP HTTP request helpers
+    // -----------------------------
+
+    async function fetchWithDpopNonceRetry({
+      url,
+      options = {},
+      authState,
+      nonceField,
+      accessToken,
+      defaultMethod = "GET",
+      getExtraHeaders = () => ({}),
+      onNonce,
+      fallbackErrorMessage = "Request failed.",
+    }) {
+      let nonce = authState?.[nonceField] || "";
+      const method = options.method || defaultMethod;
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const dpop = await createDpopProof({
+        const response = await fetchOnceWithDpop({
           url,
-          method: options.method || "POST",
+          options,
+          authState,
+          method,
           nonce,
-          publicJwk: authState.dpopPublicJwk,
-          privateJwk: authState.dpopPrivateJwk,
-        });
-
-        const response = await fetch(url, {
-          ...options,
-          headers: {
-            ...(options.headers || {}),
-            DPoP: dpop,
-          },
+          accessToken,
+          getExtraHeaders,
         });
 
         const nextNonce = response.headers.get("DPoP-Nonce");
-        if (nextNonce) authState.authServerNonce = nextNonce;
-
-        if (response.ok) {
-          return response.json();
+        if (nextNonce) {
+          authState[nonceField] = nextNonce;
+          onNonce?.(authState);
         }
 
-        const errorBody = await response.json().catch(() => ({}));
-        if (errorBody?.error === "use_dpop_nonce" && nextNonce && attempt === 0) {
+        if (response.ok) {
+          return parseResponseBody(response);
+        }
+
+        const errorBody = await safeJson(response);
+        if (shouldRetryWithDpopNonce(errorBody, nextNonce, attempt)) {
           nonce = nextNonce;
           continue;
         }
 
-        throw new Error(errorBody?.error_description || errorBody?.error || "OAuth request failed.");
+        throw createHttpError(response, errorBody, fallbackErrorMessage);
       }
 
-      throw new Error("OAuth request failed.");
+      throw new Error(fallbackErrorMessage);
+    }
+
+    async function fetchOnceWithDpop({
+      url,
+      options,
+      authState,
+      method,
+      nonce,
+      accessToken,
+      getExtraHeaders,
+    }) {
+      const dpop = await createDpopProof({
+        url,
+        method,
+        nonce,
+        accessToken,
+        publicJwk: authState.dpopPublicJwk,
+        privateJwk: authState.dpopPrivateJwk,
+      });
+
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          ...getExtraHeaders({ accessToken, dpop }),
+          DPoP: dpop,
+        },
+      });
+    }
+
+    function shouldRetryWithDpopNonce(errorBody, nextNonce, attempt) {
+      return errorBody?.error === "use_dpop_nonce" && nextNonce && attempt === 0;
+    }
+
+    async function oauthRequest(url, options, authState) {
+      return fetchWithDpopNonceRetry({
+        url,
+        options,
+        authState,
+        nonceField: "authServerNonce",
+        defaultMethod: "POST",
+        fallbackErrorMessage: "OAuth request failed.",
+      });
     }
 
     async function postOAuthForm(url, params, authState) {
-      return oauthRequest(url, {
-        method: "POST",
-        body: new URLSearchParams(params).toString(),
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+      return oauthRequest(
+        url,
+        {
+          method: "POST",
+          body: new URLSearchParams(params).toString(),
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
         },
-      }, authState);
+        authState
+      );
     }
+
+    // -----------------------------
+    // Session lifecycle
+    // -----------------------------
 
     async function refreshOAuthSession(session) {
       if (!session?.refreshToken) {
         throw new Error("This Bluesky session can no longer be refreshed.");
       }
 
-      let tokenResponse;
       try {
-        tokenResponse = await postOAuthForm(
-          session.tokenEndpoint,
-          {
-            grant_type: "refresh_token",
-            refresh_token: session.refreshToken,
-            client_id: session.clientId || getOAuthConfig().clientId,
-          },
-          session
-        );
+        const tokenResponse = await requestRefreshToken(session);
+        validateRefreshTokenResponse(tokenResponse, session);
+        return saveRefreshedSession(session, tokenResponse);
       } catch (error) {
-        if (error?.message === "Invalid refresh token") {
-          clearOAuthSession();
-          const message = "Your saved Bluesky login expired. Please log in again.";
-          window.dispatchEvent(new CustomEvent("bluesky-auth-expired", {
-            detail: { message },
-          }));
-          throw new Error(message);
-        }
+        handleRefreshSessionError(error);
         throw error;
       }
+    }
 
+    async function requestRefreshToken(session) {
+      return postOAuthForm(
+        session.tokenEndpoint,
+        {
+          grant_type: "refresh_token",
+          refresh_token: session.refreshToken,
+          client_id: session.clientId || getOAuthConfig().clientId,
+        },
+        session
+      );
+    }
+
+    function validateRefreshTokenResponse(tokenResponse, session) {
       if (tokenResponse.sub && session.did && tokenResponse.sub !== session.did) {
         throw new Error("Refreshed session DID did not match the logged-in user.");
       }
+    }
 
+    function saveRefreshedSession(session, tokenResponse) {
       const nextSession = {
         ...session,
         accessToken: tokenResponse.access_token,
@@ -2441,74 +2626,61 @@
         scope: tokenResponse.scope || session.scope,
         updatedAt: Date.now(),
       };
+
       saveOAuthSession(nextSession);
       return nextSession;
     }
 
-    async function authenticatedXrpcRequest(session, url, options = {}, allowRefresh = true) {
-      let nonce = session.resourceServerNonce || "";
+    function handleRefreshSessionError(error) {
+      if (error?.message !== "Invalid refresh token") return;
 
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const dpop = await createDpopProof({
-          url,
-          method: options.method || "GET",
-          nonce,
-          accessToken: session.accessToken,
-          publicJwk: session.dpopPublicJwk,
-          privateJwk: session.dpopPrivateJwk,
-        });
+      clearOAuthSession();
+      const message = "Your saved Bluesky login expired. Please log in again.";
 
-        const response = await fetch(url, {
-          ...options,
-          headers: {
-            ...(options.headers || {}),
-            Authorization: `DPoP ${session.accessToken}`,
-            DPoP: dpop,
-          },
-        });
+      window.dispatchEvent(new CustomEvent("bluesky-auth-expired", {
+        detail: { message },
+      }));
 
-        const nextNonce = response.headers.get("DPoP-Nonce");
-        if (nextNonce) {
-          session.resourceServerNonce = nextNonce;
-          saveOAuthSession(session);
-        }
-
-        if (response.ok) {
-          const contentType = response.headers.get("content-type") || "";
-          if (contentType.includes("application/json")) {
-            return response.json();
-          }
-          return null;
-        }
-
-        const errorBody = await response.json().catch(() => ({}));
-        if (errorBody?.error === "use_dpop_nonce" && nextNonce && attempt === 0) {
-          nonce = nextNonce;
-          continue;
-        }
-
-        const shouldRefresh =
-          allowRefresh &&
-          response.status === 401 &&
-          session.refreshToken &&
-          ["expired_token", "invalid_token", "unauthorized"].includes(errorBody?.error);
-
-        if (shouldRefresh) {
-          const refreshedSession = await refreshOAuthSession(session);
-          return authenticatedXrpcRequest(refreshedSession, url, options, false);
-        }
-
-        throw new Error(
-          errorBody?.error_description ||
-          errorBody?.message ||
-          errorBody?.error ||
-          `Request failed with ${response.status}.`
-        );
-      }
-
-      throw new Error("Authenticated request failed.");
+      throw new Error(message);
     }
 
+    async function authenticatedXrpcRequest(session, url, options = {}, allowRefresh = true) {
+      try {
+        return await requestAuthenticatedXrpc(session, url, options);
+      } catch (error) {
+        if (!shouldRefreshSession(error, session, allowRefresh)) {
+          throw error;
+        }
+
+        const refreshedSession = await refreshOAuthSession(session);
+        return authenticatedXrpcRequest(refreshedSession, url, options, false);
+      }
+    }
+
+    async function requestAuthenticatedXrpc(session, url, options = {}) {
+      return fetchWithDpopNonceRetry({
+        url,
+        options,
+        authState: session,
+        nonceField: "resourceServerNonce",
+        accessToken: session.accessToken,
+        defaultMethod: "GET",
+        getExtraHeaders: ({ accessToken }) => ({
+          Authorization: `DPoP ${accessToken}`,
+        }),
+        onNonce: saveOAuthSession,
+        fallbackErrorMessage: "Authenticated request failed.",
+      });
+    }
+
+    function shouldRefreshSession(error, session, allowRefresh) {
+      return (
+        allowRefresh &&
+        error?.status === 401 &&
+        session?.refreshToken &&
+        ["expired_token", "invalid_token", "unauthorized"].includes(error?.body?.error)
+      );
+    }
     async function getPreferences(session) {
       const params = new URLSearchParams();
       const url = `${session.pdsEndpoint}/xrpc/app.bsky.actor.getPreferences`;

@@ -1362,9 +1362,9 @@
           this.observer = new IntersectionObserver((entries, _observer) => {
             entries.forEach(async (entry) => {
               if (entry.isIntersecting) {
-                const { id } = entry.target._x_dataStack[0]?.tweet || {}
-                if (!id) return
-                const post = await db.posts.get({ cid: id })
+                const { cid } = entry.target._x_dataStack[0]?.tweet || {}
+                if (!cid) return
+                const post = await db.posts.get({ cid })
                 const views = post?.viewCount ? post.viewCount + 1 : 1
                 db.posts.put({ ...post, viewCount: views })
               }
@@ -1919,7 +1919,6 @@
           const { like, bookmarked } = viewer || {}
 
           let newTweet = {
-            id: cid,
             cid,
             uri,
             timestamp: format(new Date(record.createdAt), {
@@ -1947,9 +1946,7 @@
           };
           const { parent, root } = reply || {};
           if (parent?.uri) {
-            console.log({ parent })
             const [_, __, repo, collection, rkey] = uri.split("/");
-
             newTweet = await this.loadParent(newTweet, parent.uri)
           }
 

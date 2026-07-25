@@ -1552,10 +1552,10 @@
               : false
           }
           this.tweets = newTweets
-          this.$nextTick(() => {
-            this.postIntersectionObserver(document.querySelectorAll('.post'))
-            this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
-          })
+
+          this.postIntersectionObserver(document.querySelectorAll('.post'))
+          this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
+
         },
         markerClick(event, chartContext, opts, tweets) {
 
@@ -1686,19 +1686,21 @@
           const [_, __, repo, collection, rkey] = uri.split("/");
           let postSave = await db.posts.get({ cid })
           if (postSave?.viewCount > 0) {
-
-            // console.log("already seen this", postSave);
+            console.log("already seen this", postSave);
             //todo delete assets?
             return;
           }
           if (!postSave) {
             postSave = (await this.getPosts(uri))?.posts[0];
+            console.log({ postSave })
             db.posts.add({ ...postSave, refreshTime: Date.now() })
+          } else {
+            console.log("post exists", postSave)
           }
 
-          const { author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+          const { record, author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
           // console.log({ labels })
-          // if (!record) return;
+          if (!record) return;
           if (labels.length) {
             for (const { val } of labels) {
               ///this will count every like 
@@ -1814,7 +1816,8 @@
             this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(1) })
             if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
-              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val })).filter(d => d.likeCount > 2);
+              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val }))
+              .filter(d => d.likeCount > 2);
               // console.log({ dots })
               this.dots = dots;
             }
@@ -1892,7 +1895,7 @@
               for (const uri in this.likeTracker) {
                 if (this.likeTracker[uri]?.content) {
                   newCount++
-                } else if (this.likeTracker[uri].likeCount < 5) {
+                } else if (this.likeTracker[uri].likeCount < 6) {
                   delete this.likeTracker[uri]
                 }
               }

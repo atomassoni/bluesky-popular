@@ -22,6 +22,23 @@
       images: "++id, cid, refreshTime",
       trackedLikes: "link",
     });
+    db.version(2).stores({
+      authors: '++id, handle, refreshTime',
+      verifiers: '++id, did, refreshTime',
+      posts: "++id, cid, refreshTime",
+      videos: "++id, cid, refreshTime",
+      images: "++id, cid, refreshTime",
+      trackedLikes: "link",
+      seenPosts: "&uri, viewedAt",
+    }).upgrade(async transaction => {
+      const viewedPosts = await transaction.table('posts')
+        .filter(post => post.viewCount > 0 && Boolean(post.uri))
+        .toArray()
+      await transaction.table('seenPosts').bulkPut(viewedPosts.map(post => ({
+        uri: post.uri,
+        viewedAt: post.refreshTime || Date.now(),
+      })))
+    });
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
@@ -220,7 +237,7 @@
     <h1 x-cloak x-show="!tweets?.length || menu.showDots"
       class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 animate-pulse">
 
-      <div class="mt-3 flex flex-wrap items-end gap-x-1.5 gap-y-3 pb-2" x-on:click.away="resetTweets">
+      <div class="mt-3 flex flex-wrap items-end gap-x-1.5 gap-y-3 pb-2">
         <template x-for="dot in dots" :key="dot.link">
           <div class="flex cursor-pointer flex-col-reverse items-center gap-0.5" :title="`${dot.likeCount} likes`"
             :aria-label="`${dot.likeCount} likes`">
@@ -615,7 +632,7 @@
           <span>Reposts: <span x-text="tweet.repostCount"></span></span>
         </p>
         <!-- Like counter -->
-        <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(1) + ' per s'">
+        <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(2) + ' per s'">
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <button x-show="auth.session" class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
@@ -1362,11 +1379,9 @@
           this.observer = new IntersectionObserver((entries, _observer) => {
             entries.forEach(async (entry) => {
               if (entry.isIntersecting) {
-                const { cid } = entry.target._x_dataStack[0]?.tweet || {}
-                if (!cid) return
-                const post = await db.posts.get({ cid })
-                const views = post?.viewCount ? post.viewCount + 1 : 1
-                db.posts.put({ ...post, viewCount: views })
+                const { uri } = entry.target._x_dataStack[0]?.tweet || {}
+                if (!uri) return
+                await db.seenPosts.put({ uri, viewedAt: Date.now() })
               }
             })
           }, {
@@ -1558,13 +1573,12 @@
 
         },
         markerClick(event, chartContext, opts, tweets) {
-
           const showOnly = this.allPosts[opts.seriesIndex];
           this.tweets = [showOnly]
           this.showOnlyUri = showOnly.link
         },
-        resetPostCache() {
-          const col = db.posts.toCollection().modify(post => post.viewCount = 0)
+        async resetPostCache() {
+          await db.seenPosts.clear()
         },
         filterPosts(tweets) {
           return tweets.filter(p => this.menu.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p).filter(p => this.menu.showAllLanguages ? p : p.langs?.includes('en'))
@@ -1684,12 +1698,12 @@
         },
         async getPostExpanded(cid, uri) {
           const [_, __, repo, collection, rkey] = uri.split("/");
-          let postSave = await db.posts.get({ cid })
-          if (postSave?.viewCount > 0) {
-            console.log("already seen this", postSave);
-            //todo delete assets?
+          const seenPost = await db.seenPosts.get(uri)
+          if (seenPost) {
+            console.log("already seen this", seenPost);
             return;
           }
+          let postSave = await db.posts.get({ cid })
           if (!postSave) {
             postSave = (await this.getPosts(uri))?.posts[0];
             console.log({ postSave })
@@ -1814,60 +1828,7 @@
               this.likeTracker[uri].likeCountHistory = []
             }
             this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
-            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(1) })
-            if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
-              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val }))
-              .filter(d => d.likeCount > 2);
-              // console.log({ dots })
-              this.dots = dots;
-            }
-            if (
-              this.counter % 5000 == 0 ||
-              (this.counter < 10000 && this.counter % 1000 == 0)
-            ) {
-              const trackedPosts = Object.entries(this.likeTracker)
-                .map(([link, record]) => ({
-                  link,
-                  ...record,
-                  timestamp: record.createdAt
-                    ? format(new Date(record.createdAt), {
-                      // addSuffix: true,
-                    })
-                    : null,
-                }));
-
-              let tweets = trackedPosts
-                .filter((r) => r.content)
-                .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
-
-              const dbput = tweets.map(t => ({ likeCount: t.likeCount, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
-              db.trackedLikes.bulkPut(dbput).then(() => {
-                // console.log("Done adding 100,000 raindrops all over the place");
-              }).catch(error => {
-                if (error.name === "BulkError") {
-                  // Explicitly catching the bulkAdd() operation makes those successful
-                  // additions commit despite that there were errors.
-                  console.error("Some raindrops did not succeed. However, " +
-                    100000 - e.failures.length + " raindrops was added successfully");
-                } else {
-                  console.error(error)
-                  throw error; // we're only handling BulkError specifically here...
-                }
-              });
-              const allPosts = this.filterPosts(tweets);
-              this.allPosts = allPosts;
-              this.trackedLength = tweets.length;
-
-              if (!this.showOnlyUri) {
-                this.loadVisibleTweets(this.menu.sortField);
-              } else {
-                this.tweets = [this.likeTracker[this.showOnlyUri]]
-              }
-
-              const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
-              // // console.log({ series })
-              this.chart.updateSeries(series);
-            }
+            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(3) })
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == this.postThreshold) {
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
@@ -1887,6 +1848,61 @@
                 console.error(err);
               }
 
+            }
+
+            if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
+              const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val }))
+              .filter(d => d.likeCount > 2);
+              // console.log({ dots })
+              this.dots = dots;
+            }
+
+            if (
+              this.counter % 5000 == 0 ||
+              (this.counter < 10000 && this.counter % 1000 == 0)
+            ) {
+              const trackedPosts = Object.entries(this.likeTracker)
+                .map(([link, record]) => ({
+                  link,
+                  ...record,
+                  timestamp: record.createdAt
+                    ? format(new Date(record.createdAt), {
+                      // addSuffix: true,
+                    })
+                    : null,
+                }));
+
+              let tweets = trackedPosts
+                .filter((r) => r.content)
+                .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
+
+              // const dbput = tweets.map(t => ({ likeCount: t.likeCount, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
+              // db.trackedLikes.bulkPut(dbput).then(() => {
+              //   // console.log("Done adding 100,000 raindrops all over the place");
+              // }).catch(error => {
+              //   if (error.name === "BulkError") {
+              //     // Explicitly catching the bulkAdd() operation makes those successful
+              //     // additions commit despite that there were errors.
+              //     console.error("Some raindrops did not succeed. However, " +
+              //       100000 - e.failures.length + " raindrops was added successfully");
+              //   } else {
+              //     console.error(error)
+              //     throw error; // we're only handling BulkError specifically here...
+              //   }
+              // });
+              const allPosts = this.filterPosts(tweets);
+              this.allPosts = allPosts;
+              this.trackedLength = tweets.length;
+
+              if (!this.showOnlyUri) {
+                this.loadVisibleTweets(this.menu.sortField);
+              } else {
+                this.tweets = [this.likeTracker[this.showOnlyUri]]
+              }
+
+              const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
+              // // console.log({ series })
+              this.chart.updateSeries(series);
             }
 
             if (this.counter % 10000 == 0) {

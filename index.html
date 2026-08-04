@@ -1568,8 +1568,10 @@
           }
           this.tweets = newTweets
 
-          this.postIntersectionObserver(document.querySelectorAll('.post'))
-          this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
+          this.$nextTick(() => {
+            this.postIntersectionObserver(document.querySelectorAll('.post'))
+            this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
+          })
 
         },
         markerClick(event, chartContext, opts, tweets) {

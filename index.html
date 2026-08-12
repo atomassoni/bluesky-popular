@@ -5,7 +5,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Current Top Posts</title>
-
   <!-- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script> -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -255,7 +254,7 @@
       <div>
         <template x-for="(tweet, index) in tweets" :key="tweet.cid">
           <!-- start of tweet div -->
-          <div class="post" style="overflow-wrap: break-word;">
+          <div class="post" :data-uri="tweet.uri || tweet.link" style="overflow-wrap: break-word;">
             <!-- tweet main -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
               <!-- Profile Card Component -->
@@ -1379,7 +1378,7 @@
           this.observer = new IntersectionObserver((entries, _observer) => {
             entries.forEach(async (entry) => {
               if (entry.isIntersecting) {
-                const { uri } = entry.target._x_dataStack[0]?.tweet || {}
+                const uri = entry.target.dataset.uri
                 if (!uri) return
                 await db.seenPosts.put({ uri, viewedAt: Date.now() })
               }
@@ -1994,7 +1993,7 @@
           newTweet.parent = await this.transformPost(parent, 0, parent.author, parent.verifiers)
           return newTweet;
         },
-        async loadEmbedDetails(newTweet, embed, repo) {
+        async loadEmbedDetails(newTweet, embed, repo) {        
           if (embed.$type?.includes("embed.recordWithMedia")) {
             if (embed.media) {
               newTweet = await this.loadEmbedDetails(newTweet, embed.media, repo);
@@ -2002,7 +2001,7 @@
             if (embed.record) {
               newTweet = await this.loadRecordEmbed(newTweet, embed);
             }
-          } else if (embed.$type?.includes("embed.images")) {
+          } else if (embed.$type?.includes("embed.images") || embed.$type?.includes("embed.gallery")) {
             newTweet = await this.loadPostImages(newTweet, embed, repo)
           } else if (embed.$type?.includes("embed.external")) {
             newTweet = await this.formatEmbedExternal(newTweet, embed, repo)
@@ -2010,7 +2009,10 @@
             // console.log("video", { embed })
             newTweet.videoLink = embed.video.ref.$link;
             newTweet.images = [
-              "https://cdn3.iconfinder.com/data/icons/linecons-free-vector-icons-pack/32/video-512.png",
+              {
+                src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='2' fill='%23fff' fill-opacity='.9'/%3E%3Cpath d='M7.4 3.3 9.3 4.5 7.4 5.7Z' fill='%23111827'/%3E%3C/svg%3E",
+                alt: "Video"
+              }
             ];
           } else if (embed.$type.includes("embed.record")) {
             newTweet = await this.loadRecordEmbed(newTweet, embed);
@@ -2077,7 +2079,7 @@
         async loadPostImages(newTweet, embed, repo) {
           newTweet.images = [];
           try {
-            for (const img of embed.images) {
+            for (const img of embed.images || embed.items) {
               // console.log("IMG", img);
               const blob = await this.loadBlob(
                 'images',

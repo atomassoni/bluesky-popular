@@ -563,8 +563,8 @@
                     <div class="mt-2 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
                       <template x-for="image in tweet.quotePost.images" :key="image.src">
                         <div class="relative mt-2">
-
                           <img :src="image.src" :alt="image.alt"
+                            @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           <button x-show="image.alt" x-cloak type="button"
                             @click.prevent.stop="activeImageAlt = image.alt"
@@ -744,6 +744,7 @@
                       <div class="relative mt-2">
                         <a :href="tweet.postUrl" target="_blank" class="block mt-2">
                           <img :src="image.src" :alt="image.alt"
+                            @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           <button x-show="image.alt" x-cloak type="button"
                             @click.prevent.stop="activeImageAlt = image.alt"
@@ -898,6 +899,7 @@
 
                           <a :href="tweet.postUrl" target="_blank" class="block mt-2">
                             <img :src="image.src" :alt="image.alt"
+                              @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                               class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
                             <button x-show="image.alt" x-cloak type="button"
                               @click.prevent.stop="activeImageAlt = image.alt"
@@ -964,6 +966,7 @@
                               <div class="relative mt-2">
 
                                 <img :src="image.src" :alt="image.alt"
+                                  @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                                   class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                                 <button x-show="image.alt" x-cloak type="button"
                                   @click.prevent.stop="activeImageAlt = image.alt"
@@ -1397,6 +1400,11 @@
 
           try {
             target.videoLoading = true
+            target.images = [{
+              src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='1' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='.35' stroke-linecap='round' stroke-dasharray='4 2'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 8 4.5' to='360 8 4.5' dur='.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E",
+              alt: ""
+            }]
+
             const videoBlob = await this.loadBlob('videos', videoLink, repo)
             target.video = URL.createObjectURL(videoBlob)
             target.images = []
@@ -1853,7 +1861,7 @@
 
             if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
               const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val }))
-              .filter(d => d.likeCount > 2);
+                .filter(d => d.likeCount > 2);
               // console.log({ dots })
               this.dots = dots;
             }
@@ -1993,7 +2001,7 @@
           newTweet.parent = await this.transformPost(parent, 0, parent.author, parent.verifiers)
           return newTweet;
         },
-        async loadEmbedDetails(newTweet, embed, repo) {        
+        async loadEmbedDetails(newTweet, embed, repo) {
           if (embed.$type?.includes("embed.recordWithMedia")) {
             if (embed.media) {
               newTweet = await this.loadEmbedDetails(newTweet, embed.media, repo);
@@ -2011,7 +2019,7 @@
             newTweet.images = [
               {
                 src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='2' fill='%23fff' fill-opacity='.9'/%3E%3Cpath d='M7.4 3.3 9.3 4.5 7.4 5.7Z' fill='%23111827'/%3E%3C/svg%3E",
-                alt: "Video"
+                alt: ""
               }
             ];
           } else if (embed.$type.includes("embed.record")) {

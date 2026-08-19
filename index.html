@@ -232,17 +232,31 @@
       </div>
     </div>
 
+    <div x-cloak x-show="feeds.length" class="flex gap-2 overflow-x-auto px-4 pb-4">
+      <button @click="loadVisibleTweets(menu.sortField); selectedFeed = -1; " type="button"
+        class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
+        :class="selectedFeed === -1 ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'">
+        Popular
+      </button>
+      <template x-for="(feed, index) in feeds" :key="feed.value">
+        <button @click="menu.showDots = false;  tweets = feeds[index].posts; selectedFeed = index ; " type="button"
+          class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
+          :class="selectedFeed === index ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
+          x-text="feed.feedInfo.displayName || feed.feedInfo.name"></button>
+      </template>
+    </div>
 
-    <h1 x-cloak x-show="!tweets?.length || menu.showDots"
+
+    <h1 x-cloak x-show="menu.showDots || (!tweets?.length && selectedFeed === -1)"
       class="text-2xl font-bold mb-4 p-4 text-gray-800 dark:text-gray-200 animate-pulse">
 
       <div class="mt-3 flex flex-wrap items-end gap-x-1.5 gap-y-3 pb-2">
         <template x-for="dot in dots" :key="dot.link">
-          <div class="flex cursor-pointer flex-col-reverse items-center gap-0.5" :title="`${dot.likeCount} likes`"
-            :aria-label="`${dot.likeCount} likes`">
-            <template x-for="count in dot.likeCount" :key="`${dot.link}-${count}`">
+          <div class="flex cursor-pointer flex-col-reverse items-center gap-0.5"
+            :title="`${dot.likeHistoryLength} likes`" :aria-label="`${dot.likeHistoryLength} likes`">
+            <template x-for="count in dot.likeHistoryLength" :key="`${dot.link}-${count}`">
               <span class="h-1.5 w-1.5 rounded-full"
-                :class="dot.likeCount > 9 ? 'bg-yellow-400 dark:bg-yellow-300' : 'bg-sky-500 dark:bg-sky-400'"></span>
+                :class="dot.likeHistoryLength > 9 ? 'bg-yellow-400 dark:bg-yellow-300' : 'bg-sky-500 dark:bg-sky-400'"></span>
             </template>
           </div>
         </template>
@@ -250,9 +264,18 @@
     </h1>
 
     <div x-show="!menu.showDots" class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
+      <div x-cloak x-show="selectedFeed >= 0" class="mb-4 flex items-center gap-2">
+        <label for="feed-search" class="sr-only">Search tweets</label>
+        <input id="feed-search" type="search" x-model.debounce.200ms="searchQuery"
+          placeholder="Search tweets..."
+          class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-sky-900" />
+        <button type="button" @click="loadMoreList()" :disabled="loadingFeedList"
+          class="shrink-0 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+          x-text="loadingFeedList ? 'Loading...' : 'Load more'"></button>
+      </div>
       <!-- Tweets List -->
       <div>
-        <template x-for="(tweet, index) in tweets" :key="tweet.cid">
+        <template x-for="(tweet, index) in searchedTweets" :key="tweet.cid">
           <!-- start of tweet div -->
           <div class="post" :data-uri="tweet.uri || tweet.link" style="overflow-wrap: break-word;">
             <!-- tweet main -->
@@ -631,7 +654,8 @@
           <span>Reposts: <span x-text="tweet.repostCount"></span></span>
         </p>
         <!-- Like counter -->
-        <p class="text-sm text-gray-500 mt-2" x-text="'♡ ' + (tweet.likeCount/numSeconds).toFixed(2) + ' per s'">
+        <p class="text-sm text-gray-500 mt-2"
+          x-text="'♡ ' + (tweet.likeHistoryLength/numSeconds).toFixed(2) + ' per s'">
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <button x-show="auth.session" class="rounded-md border px-3 py-1.5 text-sm font-medium transition"
@@ -1152,7 +1176,7 @@
         websocket: null,
         observer: null,
         likeTracker: {},
-        dots: [{ likeCount: 3 }],
+        dots: [],
         labelTracker: {},
         labels: [],
         trackedLength: 0,
@@ -1169,6 +1193,7 @@
         postThreshold: 10,
         loadingReplies: false,
         loadingMoreReplies: false,
+        loadingFeedList: false,
         showModalReplies: false,
         showLoginModal: false,
         activeImageAlt: "",
@@ -1183,6 +1208,22 @@
           error: "",
           status: "",
           session: null,
+        },
+        feeds: [],
+        feedsInfo: [],
+        popularTweets: [],
+        selectedFeed: -1,
+        searchQuery: "",
+        get searchedTweets() {
+          const tweets = this.tweets || [];
+          const query = this.searchQuery.trim().toLowerCase();
+          if (this.selectedFeed < 0 || !query) return tweets;
+
+          return tweets.filter(tweet => [
+            tweet.content,
+            tweet.userName,
+            tweet.userHandle,
+          ].some(value => String(value || "").toLowerCase().includes(query)));
         },
         menu: {
           sortField: "postorder",
@@ -1210,6 +1251,27 @@
           this.chartIt()
 
         },
+        async getFeedList(item, index, limit, oldCursor) {
+          if (item.type == 'feed') {
+            const [{ feed, cursor }, { view }] = await Promise.all([this.getFeed(item.value, limit, oldCursor),
+            this.getFeedInfo(item.value)])
+            console.log({ feed, view })
+            const posts = await Promise.all(feed.map(({ post }) => this.transformPost(post, index, post.author, post.verifiers)))
+            console.log({ ...item, posts, view, cursor })
+            return { ...item, posts, feedInfo: view, cursor }
+          }
+          if (item.type == 'list') {
+            const [{ feed, cursor }, { list }] = await Promise.all([this.getListFeed(item.value, limit, oldCursor),
+            this.getListInfo(item.value)])
+
+            const posts = await Promise.all(feed.map(({ post }) => this.transformPost(post, index, post.author, post.verifiers)))
+
+            console.log({ ...item, posts, list, cursor })
+
+            return { ...item, posts, feedInfo: list, cursor }
+          }
+          return null
+        },
         async loadAuthSession() {
           this.auth.session = loadOAuthSession();
           if (!this.auth.session) return
@@ -1220,9 +1282,23 @@
             const prefs = await getPreferences(this.auth.session);
             console.log({ prefs })
             const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2")
-            console.log({ feeds })
+            console.log({ feeds });
+            for (let index = 0; index < feeds.items.length; index++) {
+              const item = feeds.items[index]
+              try {
+                const feedStuff = await this.getFeedList(item, index, 25);
+                if (feedStuff) {
+                  console.log({ feedStuff })
+                  this.feeds.push(feedStuff)
+                }
+              } catch (err) {
+                console.error(err);
+                continue
+              }
+            }
+
           } catch (error) {
-            this.auth.session = null;
+            // this.auth.session = null;
             this.auth.error = error.message || "Unable to restore your Bluesky login.";
           }
         },
@@ -1601,9 +1677,16 @@
           const scrollPosition = window.innerHeight + window.scrollY;
           const bottomPosition = document.documentElement.offsetHeight;
 
-          if (scrollPosition >= bottomPosition - 100 && this.tweets.length >= this.numToTrack) {
+          if (scrollPosition >= bottomPosition - 100) {
             this.loader = true
-            await this.loadMore();
+            if (this.selectedFeed < 0) {
+              if (this.tweets.length >= this.numToTrack) {
+                this.loadMore()
+              }
+            } else {
+              this.loadMoreList()
+            }
+
             this.loader = false;
           }
         },
@@ -1611,6 +1694,21 @@
           // console.log("load", this.numToTrack);
           this.numToTrack += 5;
           await this.loadVisibleTweets(this.menu.sortField);
+        },
+        async loadMoreList() {
+          if (this.loadingFeedList || this.selectedFeed < 0) return;
+
+          const feedIndex = this.selectedFeed;
+          this.loadingFeedList = true;
+          try {
+            const feed = this.feeds[feedIndex];
+            const res = await this.getFeedList(feed, feedIndex, 5, feed.cursor);
+            console.log({ res, feed })
+            feed.cursor = res.cursor;
+            feed.posts.push(...res.posts)
+          } finally {
+            this.loadingFeedList = false;
+          }
         },
         chartIt() {
           var options = {
@@ -1831,14 +1929,15 @@
               this.likeTracker[uri].timesUs.filter(
                 (postTime) => postTime > oneMinuteAgo
               ) || [];
-            this.likeTracker[uri].likeCount =
+            const likeCount =
               this.likeTracker[uri].timesUs.length;
+            this.likeTracker[uri].likeHistoryLength = likeCount
             if (!this.likeTracker[uri].likeCountHistory) {
               this.likeTracker[uri].likeCountHistory = []
             }
-            this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeCount / this.numSeconds;
-            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeCount / this.numSeconds).toFixed(3) })
-            if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeCount == this.postThreshold) {
+            this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeHistoryLength / this.numSeconds;
+            this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeHistoryLength / this.numSeconds).toFixed(3) })
+            if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeHistoryLength == this.postThreshold) {
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
                 const newTweet = await this.getPostExpanded(likeCid, uri);
@@ -1861,7 +1960,7 @@
 
             if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
               const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val }))
-                .filter(d => d.likeCount > 2);
+                .filter(d => d.likeHistoryLength > 2);
               // console.log({ dots })
               this.dots = dots;
             }
@@ -1885,7 +1984,7 @@
                 .filter((r) => r.content)
                 .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
 
-              // const dbput = tweets.map(t => ({ likeCount: t.likeCount, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
+              // const dbput = tweets.map(t => ({ likeHistoryLength: t.likeHistoryLength, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
               // db.trackedLikes.bulkPut(dbput).then(() => {
               //   // console.log("Done adding 100,000 raindrops all over the place");
               // }).catch(error => {
@@ -1903,10 +2002,13 @@
               this.allPosts = allPosts;
               this.trackedLength = tweets.length;
 
-              if (!this.showOnlyUri) {
-                this.loadVisibleTweets(this.menu.sortField);
-              } else {
+              if (this.showOnlyUri) {
                 this.tweets = [this.likeTracker[this.showOnlyUri]]
+              } else if (this.selectedFeed > -1) {
+                this.tweets = this.feeds[this.selectedFeed].posts
+              } else {
+                this.loadVisibleTweets(this.menu.sortField);
+
               }
 
               const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
@@ -1920,7 +2022,7 @@
               for (const uri in this.likeTracker) {
                 if (this.likeTracker[uri]?.content) {
                   newCount++
-                } else if (this.likeTracker[uri].likeCount < 6) {
+                } else if (this.likeTracker[uri].likeHistoryLength < 6) {
                   delete this.likeTracker[uri]
                 }
               }
@@ -2153,6 +2255,25 @@
           );
           return posts;
         },
+        async getAuthorFeed(actor, limit = 10) {
+          const queryParams = new URLSearchParams({ actor, limit }).toString();
+          const posts = await this.publicRequest(
+            "app.bsky.feed.getAuthorFeed",
+            queryParams
+          );
+          return posts;
+        },
+        async getListFeed(list, limit, cursor) {
+          const params = { list }
+          if (limit) params.limit = limit;
+          if (cursor) params.cursor = cursor;
+          const queryParams = new URLSearchParams(params).toString();
+          const posts = await this.publicRequest(
+            "app.bsky.feed.getListFeed",
+            queryParams
+          );
+          return posts;
+        },
         async getQuotes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
           const posts = await this.publicRequest(
@@ -2171,7 +2292,34 @@
           const imageBlob = await fetchFrom(url, "blob");
           return imageBlob;
         },
-
+        async getFeed(feed, limit, cursor) {
+          const params = { feed }
+          if (limit) params.limit = limit;
+          if (cursor) params.cursor = cursor;
+          const queryParams = new URLSearchParams(params).toString();
+          const posts = await this.publicRequest(
+            "app.bsky.feed.getFeed",
+            queryParams
+          );
+          return posts;
+        },
+        async getListInfo(list) {
+          const params = { list }
+          const queryParams = new URLSearchParams(params).toString();
+          const posts = await this.publicRequest(
+            "app.bsky.graph.getList",
+            queryParams
+          );
+          return posts;
+        },
+        async getFeedInfo(feed) {
+          const queryParams = new URLSearchParams({ feed }).toString();
+          const posts = await this.publicRequest(
+            "app.bsky.feed.getFeedGenerator",
+            queryParams
+          );
+          return posts;
+        }
       };
     }
     async function fetchFrom(url, type = "application/json") {
@@ -2279,6 +2427,7 @@
     const OAUTH_PROD_CLIENT_ID = "https://atomassoni.github.io/bluesky-popular/oauth/client-metadata.json";
     const OAUTH_PROD_REDIRECT_URI = "https://atomassoni.github.io/bluesky-popular/oauth/callback";
     const OAUTH_PROD_APP_URL = "https://atomassoni.github.io/bluesky-popular/";
+
     const OAUTH_SCOPE = "atproto transition:generic";
     const OAUTH_PENDING_STORAGE_KEY = "bluesky-popular-oauth-pending";
     const OAUTH_SESSION_STORAGE_KEY = "bluesky-popular-oauth-session";
@@ -2631,6 +2780,7 @@
     }
 
     async function requestRefreshToken(session) {
+      console.log('requesting refresh token')
       return postOAuthForm(
         session.tokenEndpoint,
         {

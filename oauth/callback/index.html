@@ -70,7 +70,7 @@
       if (tokenResponse.sub !== pending.did) {
         throw new Error("Authorized DID did not match the requested account.");
       }
-
+console.log({pending, tokenResponse})
       localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify({
         did: tokenResponse.sub,
         handle: pending.handle,

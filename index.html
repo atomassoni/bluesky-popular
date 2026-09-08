@@ -266,8 +266,7 @@
     <div x-show="!menu.showDots" class="w-full max-w-2xl p-4 bg-white dark:bg-gray-900 dark:text-gray-200">
       <div x-cloak x-show="selectedFeed >= 0" class="mb-4 flex items-center gap-2">
         <label for="feed-search" class="sr-only">Search tweets</label>
-        <input id="feed-search" type="search" x-model.debounce.200ms="searchQuery"
-          placeholder="Search tweets..."
+        <input id="feed-search" type="search" x-model.debounce.200ms="searchQuery" placeholder="Search tweets..."
           class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-sky-900" />
         <button type="button" @click="loadMoreList()" :disabled="loadingFeedList"
           class="shrink-0 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -647,7 +646,7 @@
         </template>
         <!-- other counters -->
         <p class="text-sm mt-2 text-gray-600 flex justify-between items-center space-x-4">
-          <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
+          <span>Likes: <span x-text="tweet.likeCount"></span></span>
           <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
           <span>Replies: <span x-text="tweet.replyCount"></span></span>
           <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
@@ -886,7 +885,7 @@
                   </template>
 
                   <p class="text-sm mt-1.5 text-gray-600 flex justify-between items-center space-x-4">
-                    <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
+                    <span>Likes: <span x-text="tweet.likeCount"></span></span>
                     <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                     <span>Replies: <span x-text="tweet.replyCount"></span></span>
                     <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
@@ -1041,7 +1040,7 @@
                     </template>
 
                     <p class="mt-1.5 text-sm text-gray-600 flex justify-between items-center space-x-4">
-                      <span>Likes: <span x-text="tweet.totalLikeCount"></span></span>
+                      <span>Likes: <span x-text="tweet.likeCount"></span></span>
                       <span>Quotes: <span x-text="tweet.quoteCount"></span></span>
                       <span>Replies: <span x-text="tweet.replyCount"></span></span>
                       <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
@@ -1225,6 +1224,7 @@
             tweet.userHandle,
           ].some(value => String(value || "").toLowerCase().includes(query)));
         },
+        rkeyMap: new Map(),
         menu: {
           sortField: "postorder",
           selectedSort: "default", //"popularity"
@@ -1819,7 +1819,7 @@
             console.log("post exists", postSave)
           }
 
-          const { record, author, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
+          const { record, author, likeCount, replyCount, quoteCount, repostCount, labels } = postSave || {}
           // console.log({ labels })
           if (!record) return;
           if (labels.length) {
@@ -1843,8 +1843,8 @@
             db.authors.add({ ...authorProfile, refreshTime: Date.now() })
             authorSave = { ...authorProfile, refreshTime: Date.now() }
           }
-          const ratio = authorSave.followersCount / totalLikeCount
-          // console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, totalLikeCount, ratio: authorSave.followersCount / totalLikeCount })
+          const ratio = authorSave.followersCount / likeCount
+          // console.log("followerstolikes ratio", { followersCount: authorSave.followersCount, likeCount, ratio: authorSave.followersCount / likeCount })
           if (this.menu.noBigAccounts && ratio > 25) return;
 
           let verifiersSave = []
@@ -1895,18 +1895,33 @@
 
           this.websocket.onmessage = async (event) => {
             // const event = JSON.parse(event)
-            // // console.log(event)
+            // console.log(event)
             const data = JSON.parse(event.data);
-            const { commit, time_us } = data;
 
+            const { commit, time_us } = data;
             // // console.log(data)
             if (!commit) return;
 
             const { operation, cid, record, rkey, collection } = commit || {};
 
             if (operation != "create") {
+              if (operation == "delete") {
+                const { timeUsRecorded, uri } = this.rkeyMap.get(`${data.did}/${rkey}`) || {};
+                if (!uri) return;
+                
+                if (this.likeTracker[uri]) {
+                  // console.log("unliked", uri)
+                  this.likeTracker[uri].trackedLikeCount--;
+                  this.likeTracker[uri].timesUs =
+                    this.likeTracker[uri].timesUs.filter(
+                      postTime => postTime != timeUsRecorded
+                    ) || [];
+                  this.likeTracker[uri].likeCount = this.likeTracker[uri].likeCount ? this.likeTracker[uri].likeCount - 1 : null;
+                }
+              }
               return;
             }
+            this.rkeyMap.set(`${data.did}/${rkey}`, { uri: record?.subject?.uri, timeUsRecorded: time_us })
             this.counter++;
             this.latestTimeUs =
               time_us > this.latestTimeUs ? time_us : this.latestTimeUs;
@@ -1917,27 +1932,30 @@
             const { subject, createdAt, $type } = record || {};
             const { cid: likeCid, uri } = subject || {};
             if (!this.likeTracker[uri]?.timesUs?.length) {
-              this.likeTracker[uri] = { likeCount: 0, timesUs: [] };
+              this.likeTracker[uri] = { trackedLikeCount: 0, timesUs: [] };
             }
+
             this.likeTracker[uri].cid = likeCid;
             this.likeTracker[uri].link = uri;
 
             this.likeTracker[uri].timesUs.push(time_us);
-            this.likeTracker[uri].totalLikeCount ? this.likeTracker[uri].totalLikeCount++ : 1;
+            this.likeTracker[uri].trackedLikeCount++;
+            this.likeTracker[uri].likeCount = this.likeTracker[uri].likeCount ? this.likeTracker[uri].likeCount + 1 : null;
+
 
             this.likeTracker[uri].timesUs =
               this.likeTracker[uri].timesUs.filter(
                 (postTime) => postTime > oneMinuteAgo
               ) || [];
-            const likeCount =
+            const likeCountLength =
               this.likeTracker[uri].timesUs.length;
-            this.likeTracker[uri].likeHistoryLength = likeCount
+            this.likeTracker[uri].likeHistoryLength = likeCountLength
             if (!this.likeTracker[uri].likeCountHistory) {
               this.likeTracker[uri].likeCountHistory = []
             }
             this.likeTracker[uri].likesPerSecond = this.likeTracker[uri].likeHistoryLength / this.numSeconds;
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeHistoryLength / this.numSeconds).toFixed(3) })
-            if (!this.likeTracker[uri]?.content && this.likeTracker[uri]?.likeHistoryLength == this.postThreshold) {
+            if (!this.likeTracker[uri]?.content && this.likeTracker[uri].trackedLikeCount == this.postThreshold) {
               const [_, __, repo, collection, rkey] = uri.split("/");
               try {
                 const newTweet = await this.getPostExpanded(likeCid, uri);
@@ -1945,10 +1963,10 @@
                 this.postorder++;
                 // if (newTweet.quotePost) // console.log({ newTweet })
                 if (this.likeTracker[uri]) {
-                  const { likeCount, timesUs } = this.likeTracker[uri];
+                  const { trackedLikeCount, timesUs } = this.likeTracker[uri];
                   this.likeTracker[uri] = {
                     ...newTweet,
-                    likeCount,
+                    trackedLikeCount,
                     timesUs,
                   };
                 }
@@ -1960,7 +1978,7 @@
 
             if (this.counter % 15 == 0 && (!this.tweets?.length || this.menu.showDots)) {
               const dots = Object.entries(this.likeTracker).map(([uri, val]) => ({ uri, ...val }))
-                .filter(d => d.likeHistoryLength > 2);
+                .filter(d => d.trackedLikeCount > 2);
               // console.log({ dots })
               this.dots = dots;
             }
@@ -2044,7 +2062,7 @@
           });
         },
         async transformPost(post, postorder, authorSave = {}, verifiersSave = []) {
-          const { author, record, hasAuthorThread, likeCount: totalLikeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}
+          const { author, record, hasAuthorThread, likeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
           const { embed, langs, reply } = record;
@@ -2056,7 +2074,7 @@
             timestamp: format(new Date(record.createdAt), {
               // addSuffix: true,
             }),
-            totalLikeCount,
+            likeCount,
             replyCount,
             quoteCount,
             repostCount,
@@ -2239,6 +2257,11 @@
             queryParams
           );
           return profile;
+        },
+        async getLikes(uri) {
+          const queryParams = new URLSearchParams({ uri }).toString();
+          const res = await this.makeRequest("app.bsky.feed.getLikes", queryParams);
+          return res;
         },
         async getPosts(uris) {
           const queryParams = new URLSearchParams({ uris }).toString();

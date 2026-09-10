@@ -1167,6 +1167,7 @@
   </div>
 
   </div>
+  <script src="./oauth/client.js"></script>
   <script>
     function tweetFeed() {
       return {
@@ -1238,13 +1239,15 @@
           showDots: false
         },
         async init() {
-          if (redirectLocalhostToLoopback()) return;
+          if (oauth.redirectLocalhost()) return;
           window.addEventListener("bluesky-auth-expired", (event) => {
             this.auth.session = null;
             this.openLoginModal();
             this.auth.error = event.detail?.message || "Your saved Bluesky login expired. Please log in again.";
           });
           this.loadMenu()
+          this.loadFeeds()
+
           this.loadAuthSession()
           this.addVisibilityListeners();
           this.startWebsocket();
@@ -1272,31 +1275,45 @@
           }
           return null
         },
+        loadFeeds() {
+          const feedsString = localStorage.getItem("feeds");
+          if (!feedsString) return
+          // console.log({ menuString })
+          const savedFeedPrefs = JSON.parse(feedsString);
+          this.loadFeedInfo(savedFeedPrefs)
+        },
+        saveFeedPrefs(feedPrefs) {
+          const feedsString = JSON.stringify(feedPrefs)
+          // console.log({ menuString })
+          localStorage.setItem("feeds", feedsString)
+        },
+        async loadFeedInfo(feeds) {
+          const feedResults = await Promise.allSettled(
+            feeds.items.map((item, index) => this.getFeedList(item, index, 25))
+          )
+          feedResults
+            .filter(result => result.status === 'rejected')
+            .forEach(result => console.error(result.reason))
+          const loadedFeeds = feedResults
+            .filter(result => result.status === 'fulfilled' && result.value)
+            .map(result => result.value)
+          // loadedFeeds.forEach(feedStuff => console.log({ feedStuff }))
+          this.feeds.push(...loadedFeeds)
+
+        },
         async loadAuthSession() {
-          this.auth.session = loadOAuthSession();
+          this.auth.session = oauth.loadSession();
           if (!this.auth.session) return
           if (this.auth.session?.handle) {
             this.auth.handleInput = this.auth.session.handle;
           }
           try {
             const prefs = await getPreferences(this.auth.session);
-            console.log({ prefs })
-            const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2")
-            console.log({ feeds });
-            for (let index = 0; index < feeds.items.length; index++) {
-              const item = feeds.items[index]
-              try {
-                const feedStuff = await this.getFeedList(item, index, 25);
-                if (feedStuff) {
-                  console.log({ feedStuff })
-                  this.feeds.push(feedStuff)
-                }
-              } catch (err) {
-                console.error(err);
-                continue
-              }
-            }
-
+            // console.log({ prefs })
+            const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2");
+            this.saveFeedPrefs(feeds)
+            // console.log({ feeds });
+            await this.loadFeedInfo(feeds)
           } catch (error) {
             // this.auth.session = null;
             this.auth.error = error.message || "Unable to restore your Bluesky login.";
@@ -1315,7 +1332,7 @@
           this.auth.status = "";
         },
         logout() {
-          clearOAuthSession();
+          oauth.logout();
           this.auth.session = null;
           this.auth.status = "";
           this.auth.error = "";
@@ -1347,7 +1364,7 @@
           }
         },
         async startLogin() {
-          const handle = normalizeHandle(this.auth.handleInput);
+          const handle = oauth.normalizeHandle(this.auth.handleInput);
           if (!handle) {
             this.auth.error = "Enter a valid handle.";
             return;
@@ -1357,65 +1374,8 @@
           this.auth.error = "";
 
           try {
-            const oauthConfig = getOAuthConfig();
-            this.auth.status = "Resolving handle…";
-            const did = await resolveDidFromHandle(handle);
-            if (!did) throw new Error("Could not resolve that handle.");
-
-            const isValidHandle = await verifyDidHandle(did, handle);
-            if (!isValidHandle) throw new Error("That handle did not verify against its DID document.");
-
-            this.auth.status = "Discovering your server…";
-            const pdsEndpoint = await getPdsEndpointForDid(did);
-            const oauthMetadata = await discoverAuthorizationServerMetadata(pdsEndpoint);
-
             this.auth.status = "Preparing login…";
-            const state = randomString();
-            const codeVerifier = randomString(64);
-            const codeChallenge = await sha256Base64Url(codeVerifier);
-            const dpopKeyPair = await generateDpopKeyPair();
-
-            const pendingAuth = {
-              state,
-              did,
-              handle,
-              pdsEndpoint,
-              clientId: oauthConfig.clientId,
-              redirectUri: oauthConfig.redirectUri,
-              scope: oauthConfig.scope,
-              appUrl: oauthConfig.appUrl,
-              authServerIssuer: oauthMetadata.issuer,
-              authorizationEndpoint: oauthMetadata.authorization_endpoint,
-              pushedAuthorizationRequestEndpoint: oauthMetadata.pushed_authorization_request_endpoint,
-              tokenEndpoint: oauthMetadata.token_endpoint,
-              codeVerifier,
-              dpopPublicJwk: dpopKeyPair.publicJwk,
-              dpopPrivateJwk: dpopKeyPair.privateJwk,
-              authServerNonce: "",
-              createdAt: Date.now(),
-            };
-
-            this.auth.status = "Contacting authorization server…";
-            const parResponse = await postOAuthForm(
-              oauthMetadata.pushed_authorization_request_endpoint,
-              {
-                client_id: oauthConfig.clientId,
-                redirect_uri: oauthConfig.redirectUri,
-                response_type: "code",
-                scope: oauthConfig.scope,
-                state,
-                code_challenge: codeChallenge,
-                code_challenge_method: "S256",
-                login_hint: handle,
-              },
-              pendingAuth
-            );
-
-            savePendingOAuth(pendingAuth);
-            const authUrl = new URL(oauthMetadata.authorization_endpoint);
-            authUrl.searchParams.set("client_id", oauthConfig.clientId);
-            authUrl.searchParams.set("request_uri", parResponse.request_uri);
-            window.location.assign(authUrl.toString());
+            await oauth.login(handle);
           } catch (error) {
             console.error(error);
             this.auth.error = error.message || "Unable to start login.";
@@ -1908,7 +1868,7 @@
               if (operation == "delete") {
                 const { timeUsRecorded, uri } = this.rkeyMap.get(`${data.did}/${rkey}`) || {};
                 if (!uri) return;
-                
+
                 if (this.likeTracker[uri]) {
                   // console.log("unliked", uri)
                   this.likeTracker[uri].trackedLikeCount--;
@@ -2229,7 +2189,7 @@
         async makeRequest(lexiconApi, requestParams) {
           const endpoint = this.getEndpoint(lexiconApi);
           const url = `${endpoint}?${requestParams}`;
-          return this.auth?.session ? authenticatedXrpcRequest(this.auth.session, url, { method: "GET" }) : fetchFrom(url)
+          return this.auth?.session ? oauth.fetch(this.auth.session, url) : fetchFrom(url)
         },
         async publicRequest(lexiconApi, requestParams) {
           const endpoint = `https://public.api.bsky.app/xrpc/${lexiconApi}`
@@ -2443,459 +2403,16 @@
       pdsEndpointCache.set(did, pdsEndpoint);
       return pdsEndpoint;
     }
-    // -----------------------------
-    // OAuth constants
-    // -----------------------------
-
-    const OAUTH_PROD_CLIENT_ID = "https://atomassoni.github.io/bluesky-popular/oauth/client-metadata.json";
-    const OAUTH_PROD_REDIRECT_URI = "https://atomassoni.github.io/bluesky-popular/oauth/callback";
-    const OAUTH_PROD_APP_URL = "https://atomassoni.github.io/bluesky-popular/";
-
-    const OAUTH_SCOPE = "atproto transition:generic";
-    const OAUTH_PENDING_STORAGE_KEY = "bluesky-popular-oauth-pending";
-    const OAUTH_SESSION_STORAGE_KEY = "bluesky-popular-oauth-session";
-
-    // -----------------------------
-    // OAuth config / environment
-    // -----------------------------
-
-    function getOAuthConfig() {
-      if (isLocalOAuthTesting()) {
-        return getLocalOAuthConfig();
-      }
-
-      return getProductionOAuthConfig();
-    }
-
-    function getProductionOAuthConfig() {
-      return {
-        clientId: OAUTH_PROD_CLIENT_ID,
-        redirectUri: OAUTH_PROD_REDIRECT_URI,
-        appUrl: OAUTH_PROD_APP_URL,
-        scope: OAUTH_SCOPE,
-        mode: "production",
-      };
-    }
-
-    function getLocalOAuthConfig() {
-      const appUrl = getAppBaseUrl();
-      const callbackUrl = new URL("oauth/callback/", appUrl);
-      const localhostClientId = new URL("http://localhost");
-
-      localhostClientId.searchParams.append("redirect_uri", callbackUrl.toString());
-      localhostClientId.searchParams.set("scope", OAUTH_SCOPE);
-
-      return {
-        clientId: localhostClientId.toString(),
-        redirectUri: callbackUrl.toString(),
-        appUrl,
-        scope: OAUTH_SCOPE,
-        mode: "localhost",
-      };
-    }
-
-    function isLocalOAuthTesting() {
-      return ["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname);
-    }
-
-    function redirectLocalhostToLoopback() {
-      if (window.location.hostname !== "localhost") return false;
-
-      const loopbackUrl = new URL(window.location.href);
-      loopbackUrl.hostname = "127.0.0.1";
-      window.location.replace(loopbackUrl.toString());
-      return true;
-    }
-
-    function getAppBaseUrl() {
-      const baseUrl = window.location.href.endsWith("/")
-        ? new URL(window.location.href)
-        : new URL(".", window.location.href);
-
-      if (isLocalOAuthTesting()) {
-        baseUrl.hostname = "127.0.0.1";
-      }
-
-      return baseUrl.toString();
-    }
-
-    // -----------------------------
-    // General helpers
-    // -----------------------------
-
-    function normalizeHandle(handle) {
-      return (handle || "").trim().replace(/^@/, "").toLowerCase();
-    }
-
-    async function safeJson(response) {
-      return response.json().catch(() => ({}));
-    }
-
-    async function parseResponseBody(response) {
-      const contentType = response.headers.get("content-type") || "";
-
-      if (contentType.includes("application/json")) {
-        return response.json();
-      }
-
-      return null;
-    }
-
-    function getErrorMessage(errorBody, fallbackMessage) {
-      return (
-        errorBody?.error_description ||
-        errorBody?.message ||
-        errorBody?.error ||
-        fallbackMessage
-      );
-    }
-
-    function createHttpError(response, errorBody, fallbackMessage) {
-      const error = new Error(getErrorMessage(errorBody, fallbackMessage));
-      error.status = response.status;
-      error.body = errorBody;
-      return error;
-    }
-
-    // -----------------------------
-    // Crypto helpers
-    // -----------------------------
-
-    function randomString(size = 32) {
-      return base64UrlEncode(crypto.getRandomValues(new Uint8Array(size)));
-    }
-
-    function base64UrlEncode(input) {
-      const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
-      let binary = "";
-
-      for (const byte of bytes) {
-        binary += String.fromCharCode(byte);
-      }
-
-      return btoa(binary)
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/g, "");
-    }
-
-    async function sha256Base64Url(value) {
-      const bytes = new TextEncoder().encode(value);
-      const digest = await crypto.subtle.digest("SHA-256", bytes);
-      return base64UrlEncode(digest);
-    }
-
-    // -----------------------------
-    // DPoP key/proof helpers
-    // -----------------------------
-
-    async function generateDpopKeyPair() {
-      const keyPair = await crypto.subtle.generateKey(
-        { name: "ECDSA", namedCurve: "P-256" },
-        true,
-        ["sign", "verify"]
-      );
-
-      const [publicJwk, privateJwk] = await Promise.all([
-        crypto.subtle.exportKey("jwk", keyPair.publicKey),
-        crypto.subtle.exportKey("jwk", keyPair.privateKey),
-      ]);
-
-      return { publicJwk, privateJwk };
-    }
-
-    async function importDpopKeyPair(publicJwk, privateJwk) {
-      const algorithm = { name: "ECDSA", namedCurve: "P-256" };
-
-      const [publicKey, privateKey] = await Promise.all([
-        crypto.subtle.importKey("jwk", publicJwk, algorithm, true, ["verify"]),
-        crypto.subtle.importKey("jwk", privateJwk, algorithm, true, ["sign"]),
-      ]);
-
-      return { publicKey, privateKey };
-    }
-
-    async function createDpopProof({ url, method, nonce, accessToken, publicJwk, privateJwk }) {
-      const { privateKey } = await importDpopKeyPair(publicJwk, privateJwk);
-      const signingInput = await createDpopSigningInput({
-        url,
-        method,
-        nonce,
-        accessToken,
-        publicJwk,
-      });
-
-      const signature = await crypto.subtle.sign(
-        { name: "ECDSA", hash: "SHA-256" },
-        privateKey,
-        new TextEncoder().encode(signingInput)
-      );
-
-      return `${signingInput}.${base64UrlEncode(signature)}`;
-    }
-
-    async function createDpopSigningInput({ url, method, nonce, accessToken, publicJwk }) {
-      const header = createDpopHeader(publicJwk);
-      const payload = await createDpopPayload({ url, method, nonce, accessToken });
-      return `${encodeJwtPart(header)}.${encodeJwtPart(payload)}`;
-    }
-
-    function createDpopHeader(publicJwk) {
-      return {
-        typ: "dpop+jwt",
-        alg: "ES256",
-        jwk: {
-          kty: publicJwk.kty,
-          crv: publicJwk.crv,
-          x: publicJwk.x,
-          y: publicJwk.y,
-        },
-      };
-    }
-
-    async function createDpopPayload({ url, method, nonce, accessToken }) {
-      const issuedAt = Math.floor(Date.now() / 1000);
-      const payload = {
-        jti: randomString(24),
-        htm: method.toUpperCase(),
-        htu: url,
-        iat: issuedAt,
-        exp: issuedAt + 300,
-      };
-
-      if (nonce) payload.nonce = nonce;
-      if (accessToken) payload.ath = await sha256Base64Url(accessToken);
-
-      return payload;
-    }
-
-    function encodeJwtPart(value) {
-      const json = JSON.stringify(value);
-      const bytes = new TextEncoder().encode(json);
-      return base64UrlEncode(bytes);
-    }
-
-    // -----------------------------
-    // DPoP HTTP request helpers
-    // -----------------------------
-
-    async function fetchWithDpopNonceRetry({
-      url,
-      options = {},
-      authState,
-      nonceField,
-      accessToken,
-      defaultMethod = "GET",
-      getExtraHeaders = () => ({}),
-      onNonce,
-      fallbackErrorMessage = "Request failed.",
-    }) {
-      let nonce = authState?.[nonceField] || "";
-      const method = options.method || defaultMethod;
-
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const response = await fetchOnceWithDpop({
-          url,
-          options,
-          authState,
-          method,
-          nonce,
-          accessToken,
-          getExtraHeaders,
-        });
-
-        const nextNonce = response.headers.get("DPoP-Nonce");
-        if (nextNonce) {
-          authState[nonceField] = nextNonce;
-          onNonce?.(authState);
-        }
-
-        if (response.ok) {
-          return parseResponseBody(response);
-        }
-
-        const errorBody = await safeJson(response);
-        if (shouldRetryWithDpopNonce(errorBody, nextNonce, attempt)) {
-          nonce = nextNonce;
-          continue;
-        }
-
-        throw createHttpError(response, errorBody, fallbackErrorMessage);
-      }
-
-      throw new Error(fallbackErrorMessage);
-    }
-
-    async function fetchOnceWithDpop({
-      url,
-      options,
-      authState,
-      method,
-      nonce,
-      accessToken,
-      getExtraHeaders,
-    }) {
-      const dpop = await createDpopProof({
-        url,
-        method,
-        nonce,
-        accessToken,
-        publicJwk: authState.dpopPublicJwk,
-        privateJwk: authState.dpopPrivateJwk,
-      });
-
-      return fetch(url, {
-        ...options,
-        headers: {
-          ...(options.headers || {}),
-          ...getExtraHeaders({ accessToken, dpop }),
-          DPoP: dpop,
-        },
-      });
-    }
-
-    function shouldRetryWithDpopNonce(errorBody, nextNonce, attempt) {
-      return errorBody?.error === "use_dpop_nonce" && nextNonce && attempt === 0;
-    }
-
-    async function oauthRequest(url, options, authState) {
-      return fetchWithDpopNonceRetry({
-        url,
-        options,
-        authState,
-        nonceField: "authServerNonce",
-        defaultMethod: "POST",
-        fallbackErrorMessage: "OAuth request failed.",
-      });
-    }
-
-    async function postOAuthForm(url, params, authState) {
-      return oauthRequest(
-        url,
-        {
-          method: "POST",
-          body: new URLSearchParams(params).toString(),
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        },
-        authState
-      );
-    }
-
-    // -----------------------------
-    // Session lifecycle
-    // -----------------------------
-
-    async function refreshOAuthSession(session) {
-      if (!session?.refreshToken) {
-        throw new Error("This Bluesky session can no longer be refreshed.");
-      }
-
-      try {
-        const tokenResponse = await requestRefreshToken(session);
-        validateRefreshTokenResponse(tokenResponse, session);
-        return saveRefreshedSession(session, tokenResponse);
-      } catch (error) {
-        handleRefreshSessionError(error);
-        throw error;
-      }
-    }
-
-    async function requestRefreshToken(session) {
-      console.log('requesting refresh token')
-      return postOAuthForm(
-        session.tokenEndpoint,
-        {
-          grant_type: "refresh_token",
-          refresh_token: session.refreshToken,
-          client_id: session.clientId || getOAuthConfig().clientId,
-        },
-        session
-      );
-    }
-
-    function validateRefreshTokenResponse(tokenResponse, session) {
-      if (tokenResponse.sub && session.did && tokenResponse.sub !== session.did) {
-        throw new Error("Refreshed session DID did not match the logged-in user.");
-      }
-    }
-
-    function saveRefreshedSession(session, tokenResponse) {
-      const nextSession = {
-        ...session,
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token || session.refreshToken,
-        scope: tokenResponse.scope || session.scope,
-        updatedAt: Date.now(),
-      };
-
-      saveOAuthSession(nextSession);
-      return nextSession;
-    }
-
-    function handleRefreshSessionError(error) {
-      if (error?.message !== "Invalid refresh token") return;
-
-      clearOAuthSession();
-      const message = "Your saved Bluesky login expired. Please log in again.";
-
-      window.dispatchEvent(new CustomEvent("bluesky-auth-expired", {
-        detail: { message },
-      }));
-
-      throw new Error(message);
-    }
-
-    async function authenticatedXrpcRequest(session, url, options = {}, allowRefresh = true) {
-      try {
-        return await requestAuthenticatedXrpc(session, url, options);
-      } catch (error) {
-        if (!shouldRefreshSession(error, session, allowRefresh)) {
-          throw error;
-        }
-
-        const refreshedSession = await refreshOAuthSession(session);
-        return authenticatedXrpcRequest(refreshedSession, url, options, false);
-      }
-    }
-
-    async function requestAuthenticatedXrpc(session, url, options = {}) {
-      return fetchWithDpopNonceRetry({
-        url,
-        options,
-        authState: session,
-        nonceField: "resourceServerNonce",
-        accessToken: session.accessToken,
-        defaultMethod: "GET",
-        getExtraHeaders: ({ accessToken }) => ({
-          Authorization: `DPoP ${accessToken}`,
-        }),
-        onNonce: saveOAuthSession,
-        fallbackErrorMessage: "Authenticated request failed.",
-      });
-    }
-
-    function shouldRefreshSession(error, session, allowRefresh) {
-      return (
-        allowRefresh &&
-        error?.status === 401 &&
-        session?.refreshToken &&
-        ["expired_token", "invalid_token", "unauthorized"].includes(error?.body?.error)
-      );
-    }
     async function getPreferences(session) {
-      const params = new URLSearchParams();
       const url = `${session.pdsEndpoint}/xrpc/app.bsky.actor.getPreferences`;
-      return authenticatedXrpcRequest(session, url, { method: "GET" });
+      return oauth.fetch(session, url);
     }
 
     async function createLikeRecord(session, subject) {
       if (!subject?.uri || !subject?.cid) {
         throw new Error("Missing the post URI or CID needed to create a like.");
       }
-      console.log({ session })
-      return authenticatedXrpcRequest(
+      return oauth.fetch(
         session,
         `${session.pdsEndpoint}/xrpc/com.atproto.repo.createRecord`,
         {
@@ -2925,7 +2442,7 @@
         throw new Error("Could not parse the like record URI.");
       }
 
-      return authenticatedXrpcRequest(
+      return oauth.fetch(
         session,
         `${session.pdsEndpoint}/xrpc/com.atproto.repo.deleteRecord`,
         {
@@ -2947,51 +2464,6 @@
       const [repo, collection, rkey] = uri.slice(5).split("/");
       if (!repo || !collection || !rkey) return null;
       return { repo, collection, rkey };
-    }
-
-    async function discoverAuthorizationServerMetadata(pdsEndpoint) {
-      const protectedResourceUrl = `${new URL(pdsEndpoint).origin}/.well-known/oauth-protected-resource`;
-      const protectedResource = await fetchFrom(protectedResourceUrl);
-      const authServer = protectedResource?.authorization_servers?.[0] || new URL(pdsEndpoint).origin;
-      const metadata = await fetchFrom(`${authServer}/.well-known/oauth-authorization-server`);
-      if (!metadata?.issuer || !metadata?.authorization_endpoint || !metadata?.token_endpoint || !metadata?.pushed_authorization_request_endpoint) {
-        throw new Error("OAuth server metadata is incomplete.");
-      }
-
-      const scopes = Array.isArray(metadata.scopes_supported)
-        ? metadata.scopes_supported
-        : String(metadata.scopes_supported || "").split(/\s+/);
-      if (!scopes.includes("atproto")) {
-        throw new Error("That server does not advertise atproto OAuth support.");
-      }
-
-      return metadata;
-    }
-
-    function savePendingOAuth(pendingAuth) {
-      localStorage.setItem(OAUTH_PENDING_STORAGE_KEY, JSON.stringify(pendingAuth));
-    }
-
-    function saveOAuthSession(session) {
-      localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
-    }
-
-    function loadOAuthSession() {
-      const raw = localStorage.getItem(OAUTH_SESSION_STORAGE_KEY);
-      if (!raw) return null;
-
-      try {
-        return JSON.parse(raw);
-      } catch (error) {
-        console.error(error);
-        localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY);
-        return null;
-      }
-    }
-
-    function clearOAuthSession() {
-      localStorage.removeItem(OAUTH_PENDING_STORAGE_KEY);
-      localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY);
     }
 
     function chunkArray(values, size) {

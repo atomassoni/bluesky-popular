@@ -513,6 +513,7 @@
                   <div class="relative mt-2">
                     <a :href="tweet.postUrl" target="_blank" class="block">
                       <img :src="image.src" :alt="image.alt"
+                        @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                         class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                     </a>
                     <button x-show="image.alt" x-cloak type="button" @click.prevent.stop="activeImageAlt = image.alt"
@@ -780,7 +781,7 @@
 
                     </template>
                   </div>
-
+                  <!-- active reply main video -->
                   <div class="mt-1.5" x-show="tweet.video">
                     <video :src="tweet.video" controls loop muted
                       class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
@@ -835,6 +836,7 @@
                           <template x-for="image in tweet.quotePost.images" :key="image.src">
                             <div class="relative mt-2">
                               <img :src="image.src" :alt="image.alt"
+                                @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                                 class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                               <button x-show="image.alt" x-cloak type="button"
                                 @click.prevent.stop="activeImageAlt = image.alt"
@@ -845,6 +847,7 @@
                             </div>
                           </template>
                         </div>
+                        <!-- quote post active reply video -->
                         <div class="mt-1.5" x-show="tweet.quotePost.video">
                           <video :src="tweet.quotePost.video" controls loop muted
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
@@ -934,7 +937,7 @@
                         </div>
                       </template>
                     </div>
-
+                    <!-- non-active reply main video -->
                     <div class="mt-1.5" x-show="tweet.video">
                       <video :src="tweet.video" controls loop muted
                         class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
@@ -1000,6 +1003,7 @@
                               </div>
                             </template>
                           </div>
+                          <!-- non active reply quote post video -->
                           <div class="mt-1.5" x-show="tweet.quotePost.video">
                             <video :src="tweet.quotePost.video" controls loop muted
                               class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">

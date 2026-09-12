@@ -2182,29 +2182,21 @@
             return newTweet
           }
         },
-        getEndpoint(lexiconApi) {
-          const baseUrl = this.auth?.session ? this.auth.session.pdsEndpoint : "https://public.api.bsky.app";
-          return `${baseUrl}/xrpc/${lexiconApi}`
-        },
-        async makeRequest(lexiconApi, requestParams) {
-          const endpoint = this.getEndpoint(lexiconApi);
-          const url = `${endpoint}?${requestParams}`;
-          return this.auth?.session ? oauth.fetch(this.auth.session, url) : fetchFrom(url)
-        },
-        async publicRequest(lexiconApi, requestParams) {
-          const endpoint = `https://public.api.bsky.app/xrpc/${lexiconApi}`
-          const url = `${endpoint}?${requestParams}`;
-          const res = await fetchFrom(url);
-          return res;
+        async apiRequest(lexiconApi, requestParams, forcePublic = false) {
+          const usePublic = !this.auth?.session || forcePublic;
+          const baseUrl = usePublic ? "https://public.api.bsky.app" : this.auth.session.pdsEndpoint;
+          const url = `${baseUrl}/xrpc/${lexiconApi}?${requestParams}`;
+          return usePublic ? fetchFrom(url) : oauth.fetch(this.auth.session, url);
         },
         async getServices(actorIdentifier) {
           const queryParams = new URLSearchParams({
             dids: actorIdentifier,
             detailed: true,
           }).toString();
-          const profile = await this.publicRequest(
+          const profile = await this.apiRequest(
             "app.bsky.labeler.getServices",
-            queryParams
+            queryParams,
+            true
           );
           return profile;
         },
@@ -2212,37 +2204,40 @@
           const queryParams = new URLSearchParams({
             actor: actorIdentifier,
           }).toString();
-          const profile = await this.publicRequest(
+          const profile = await this.apiRequest(
             "app.bsky.actor.getProfile",
-            queryParams
+            queryParams,
+            true
           );
           return profile;
         },
         async getLikes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
-          const res = await this.makeRequest("app.bsky.feed.getLikes", queryParams);
+          const res = await this.apiRequest("app.bsky.feed.getLikes", queryParams);
           return res;
         },
         async getPosts(uris) {
           const queryParams = new URLSearchParams({ uris }).toString();
-          const res = await this.makeRequest("app.bsky.feed.getPosts", queryParams);
+          const res = await this.apiRequest("app.bsky.feed.getPosts", queryParams);
           return res;
         },
         //todo add authenticated getActorLikes?
         async getPostThread(uri, depth = 6) {
           const queryParams = new URLSearchParams({ uri, depth }).toString();
-          //todo after adding the like button to replies switch to makeRequest
-          const posts = await this.publicRequest(
+          //todo after adding the like button to replies switch to not force public
+          const posts = await this.apiRequest(
             "app.bsky.feed.getPostThread",
-            queryParams
+            queryParams,
+            true
           );
           return posts;
         },
         async getAuthorFeed(actor, limit = 10) {
           const queryParams = new URLSearchParams({ actor, limit }).toString();
-          const posts = await this.publicRequest(
+          const posts = await this.apiRequest(
             "app.bsky.feed.getAuthorFeed",
-            queryParams
+            queryParams,
+            true
           );
           return posts;
         },
@@ -2251,17 +2246,18 @@
           if (limit) params.limit = limit;
           if (cursor) params.cursor = cursor;
           const queryParams = new URLSearchParams(params).toString();
-          const posts = await this.publicRequest(
+          const posts = await this.apiRequest(
             "app.bsky.feed.getListFeed",
-            queryParams
+            queryParams,
           );
           return posts;
         },
         async getQuotes(uri) {
           const queryParams = new URLSearchParams({ uri }).toString();
-          const posts = await this.publicRequest(
+          const posts = await this.apiRequest(
             "app.bsky.feed.getQuotes",
-            queryParams
+            queryParams,
+            true
           );
           return posts;
         },
@@ -2280,26 +2276,28 @@
           if (limit) params.limit = limit;
           if (cursor) params.cursor = cursor;
           const queryParams = new URLSearchParams(params).toString();
-          const posts = await this.publicRequest(
+          const posts = await this.apiRequest(
             "app.bsky.feed.getFeed",
-            queryParams
+            queryParams,
           );
           return posts;
         },
         async getListInfo(list) {
           const params = { list }
           const queryParams = new URLSearchParams(params).toString();
-          const posts = await this.publicRequest(
+          const posts = await this.apiRequest(
             "app.bsky.graph.getList",
-            queryParams
+            queryParams,
+            true
           );
           return posts;
         },
         async getFeedInfo(feed) {
           const queryParams = new URLSearchParams({ feed }).toString();
-          const posts = await this.publicRequest(
+          const posts = await this.apiRequest(
             "app.bsky.feed.getFeedGenerator",
-            queryParams
+            queryParams,
+            true
           );
           return posts;
         }

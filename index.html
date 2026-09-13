@@ -233,14 +233,14 @@
     </div>
 
     <div x-cloak x-show="feeds.length" class="flex gap-2 overflow-x-auto px-4 pb-4">
-      <button @click="loadVisibleTweets(menu.sortField); selectedFeed = -1; " type="button"
+      <button @click="loadVisibleTweets(menu.sortField); selectedFeed = -1; saveSelectedFeed();" type="button"
         class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
         :class="selectedFeed === -1 ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'">
         Popular
       </button>
       <template x-for="(feed, index) in feeds" :key="feed.value">
-        <button @click="menu.showDots = false;  tweets = feeds[index].posts; selectedFeed = index ; " type="button"
-          class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
+        <button @click="menu.showDots = false;  tweets = feeds[index].posts; selectedFeed = index; saveSelectedFeed();"
+          type="button" class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
           :class="selectedFeed === index ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'"
           x-text="feed.feedInfo.displayName || feed.feedInfo.name"></button>
       </template>
@@ -784,7 +784,7 @@
                   <!-- active reply main video -->
                   <div class="mt-1.5" x-show="tweet.video">
                     <video :src="tweet.video" controls loop muted
-                      class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                      class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                       Your browser does not support the video tag.
                     </video>
                   </div>
@@ -850,7 +850,7 @@
                         <!-- quote post active reply video -->
                         <div class="mt-1.5" x-show="tweet.quotePost.video">
                           <video :src="tweet.quotePost.video" controls loop muted
-                            class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                            class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                             Your browser does not support the video tag.
                           </video>
                         </div>
@@ -1006,7 +1006,7 @@
                           <!-- non active reply quote post video -->
                           <div class="mt-1.5" x-show="tweet.quotePost.video">
                             <video :src="tweet.quotePost.video" controls loop muted
-                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                              class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                               Your browser does not support the video tag.
                             </video>
                           </div>
@@ -1214,7 +1214,6 @@
           session: null,
         },
         feeds: [],
-        feedsInfo: [],
         popularTweets: [],
         selectedFeed: -1,
         searchQuery: "",
@@ -1270,40 +1269,46 @@
           if (item.type == 'list') {
             const [{ feed, cursor }, { list }] = await Promise.all([this.getListFeed(item.value, limit, oldCursor),
             this.getListInfo(item.value)])
-
             const posts = await Promise.all(feed.map(({ post }) => this.transformPost(post, index, post.author, post.verifiers)))
-
             console.log({ ...item, posts, list, cursor })
-
             return { ...item, posts, feedInfo: list, cursor }
           }
           return null
         },
         loadFeeds() {
           const feedsString = localStorage.getItem("feeds");
-          if (!feedsString) return
-          // console.log({ menuString })
-          const savedFeedPrefs = JSON.parse(feedsString);
-          this.loadFeedInfo(savedFeedPrefs)
+          const selectedFeed = localStorage.getItem("selectedFeed");
+          const feedPrefs = localStorage.getItem("feedPrefs");
+
+          if (!feedPrefs) return
+          this.feeds = JSON.parse(feedsString)
+          this.selectedFeed = Number(selectedFeed)
+          this.loadFeedInfo(feedPrefs)
         },
-        saveFeedPrefs(feedPrefs) {
-          const feedsString = JSON.stringify(feedPrefs)
-          // console.log({ menuString })
+        saveSelectedFeed() {
+          localStorage.setItem("selectedFeed", this.selectedFeed)
+        },
+        saveFeeds(feeds) {
+          const feedsString = JSON.stringify(feeds)
           localStorage.setItem("feeds", feedsString)
+        },
+         saveFeedPrefs(feedPrefs) {
+          const feedsString = JSON.stringify(feedPrefs)
+          localStorage.setItem("feedPrefs", feedsString)
         },
         async loadFeedInfo(feeds) {
           const feedResults = await Promise.allSettled(
             feeds.items.map((item, index) => this.getFeedList(item, index, 25))
           )
-          feedResults
-            .filter(result => result.status === 'rejected')
-            .forEach(result => console.error(result.reason))
+          // feedResults
+          //   .filter(result => result.status === 'rejected')
+          //   .forEach(result => console.error(result.reason))
           const loadedFeeds = feedResults
             .filter(result => result.status === 'fulfilled' && result.value)
             .map(result => result.value)
           // loadedFeeds.forEach(feedStuff => console.log({ feedStuff }))
-          this.feeds.push(...loadedFeeds)
-
+          this.feeds = [...loadedFeeds]
+          this.saveFeeds(this.feeds)
         },
         async loadAuthSession() {
           this.auth.session = oauth.loadSession();
@@ -1315,8 +1320,8 @@
             const prefs = await getPreferences(this.auth.session);
             // console.log({ prefs })
             const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2");
-            this.saveFeedPrefs(feeds)
             // console.log({ feeds });
+            this.saveFeedPrefs(prefs)
             await this.loadFeedInfo(feeds)
           } catch (error) {
             // this.auth.session = null;
@@ -1446,7 +1451,7 @@
             }]
 
             const videoBlob = await this.loadBlob('videos', videoLink, repo)
-            target.video = URL.createObjectURL(videoBlob)
+            target.video = URL.createObjectURL(videoBlob);
             target.images = []
             // console.log(`loaded ${label}`, target)
           } catch (err) {

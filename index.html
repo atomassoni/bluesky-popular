@@ -14,30 +14,15 @@
 
     const db = new Dexie('BlueskyDatabase');
     db.version(1).stores({
-      authors: '++id, handle, refreshTime',
-      verifiers: '++id, did, refreshTime',
-      posts: "++id, cid, refreshTime",
-      videos: "++id, cid, refreshTime",
-      images: "++id, cid, refreshTime",
-      trackedLikes: "link",
-    });
-    db.version(2).stores({
-      authors: '++id, handle, refreshTime',
+
+      authors: '++id, did, refreshTime',
       verifiers: '++id, did, refreshTime',
       posts: "++id, cid, refreshTime",
       videos: "++id, cid, refreshTime",
       images: "++id, cid, refreshTime",
       trackedLikes: "link",
       seenPosts: "&uri, viewedAt",
-    }).upgrade(async transaction => {
-      const viewedPosts = await transaction.table('posts')
-        .filter(post => post.viewCount > 0 && Boolean(post.uri))
-        .toArray()
-      await transaction.table('seenPosts').bulkPut(viewedPosts.map(post => ({
-        uri: post.uri,
-        viewedAt: post.refreshTime || Date.now(),
-      })))
-    });
+    })
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
@@ -69,7 +54,7 @@
 
 <body class="bg-white dark:bg-gray-900 min-h-screen flex items-center justify-center">
   <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())"
-    x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt)"
+    x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt || !!showAuthor)"
     id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
     @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
     <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
@@ -192,18 +177,6 @@
 
             </template>
             <li>
-              <p @click="menu.showOnlyAuthorProfile = !menu.showOnlyAuthorProfile; open = false"
-                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showOnlyAuthorProfile}">
-                Show author profile
-                <svg x-show="menu.showOnlyAuthorProfile" xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </p>
-            </li>
-            <li>
               <p @click="menu.noBigAccounts = !menu.noBigAccounts; postThreshold = menu.noBigAccounts? 5 : 10; open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': menu.noBigAccounts}">
@@ -282,159 +255,213 @@
               <!-- Profile Card Component -->
               <div class="w-full max-w-2xl mx-auto">
                 <!-- Profile -->
-                <article x-show="menu.showOnlyAuthorProfile && tweet.author" x-cloak
-                  class="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:bg-neutral-900 dark:border-neutral-800">
-                  <!-- Header -->
-                  <!-- Profile card (optional wrapper) -->
-                  <div
-                    class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:bg-neutral-900 dark:border-neutral-800">
-                    <!-- Banner behind everything -->
-                    <div class="absolute inset-x-0 top-0 h-28 sm:h-36 z-0">
-                      <img :src="tweet.author.banner" @error="$event.target.remove()" alt=""
-                        class="h-full w-full object-cover" loading="lazy" />
-                      <div class="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none">
-                      </div>
-                    </div>
-
-                    <!-- Content above banner -->
-                    <div class="relative z-10 px-6 pt-20 sm:pt-24"> <!-- pad top to clear banner height -->
-                      <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                        <img :src="tweet.author.avatar || fallbackAvatar" @error="$event.target.src = fallbackAvatar"
-                          alt=""
-                          class="relative z-10 h-20 w-20 rounded-full object-cover ring-4 ring-white dark:ring-neutral-900" />
-
-                        <div class="flex-1 min-w-0">
-                          <div class="flex items-center gap-1">
-                            <h1 class="text-xl font-semibold tracking-tight text-gray-900 dark:text-white truncate">
-                              <span x-text="tweet.author.displayName || tweet.author.handle || 'Unknown'"></span>
-                            </h1>
-                            <!-- green check icon inline (no text) -->
-                            <template
-                              x-if="(tweet.author?.verifications || []).some(v => v?.isValid)
-                  || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
-                              <svg xmlns="http://www.w3.org/2000/svg"
-                                class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
-                                fill="currentColor" aria-label="Verified account" role="img">
-                                <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                              </svg>
-                            </template>
-                          </div>
-
-                          <div
-                            class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-                            <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
-                              class="hover:underline" x-text="'@' + (tweet.author.handle || 'unknown')"></a>
-                            <span class="hidden sm:inline">•</span>
-                            <span class="truncate" :title="tweet.author.did" x-text="tweet.author.did"></span>
-                          </div>
+                <div x-show="!!showAuthor" x-cloak @keydown.escape.window="showAuthor = null"
+                  class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+                  role="dialog" aria-modal="true" aria-label="Author profile">
+                  <article @click.outside="showAuthor = null"
+                    class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6 rounded-2xl border border-gray-200 bg-white shadow-2xl dark:bg-neutral-900 dark:border-neutral-800">
+                    <button type="button" @click="showAuthor = null"
+                      class="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-2xl leading-none text-gray-600 shadow hover:bg-white hover:text-gray-900 dark:bg-neutral-800/90 dark:text-gray-300 dark:hover:bg-neutral-700 dark:hover:text-white"
+                      aria-label="Close author profile">&times;</button>
+                    <!-- Header -->
+                    <!-- Profile card (optional wrapper) -->
+                    <div
+                      class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:bg-neutral-900 dark:border-neutral-800">
+                      <!-- Banner behind everything -->
+                      <div class="absolute inset-x-0 top-0 h-28 sm:h-36 z-0">
+                        <img :src="showAuthor?.banner" @error="$event.target.remove()" alt=""
+                          class="h-full w-full object-cover" loading="lazy" />
+                        <div class="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none">
                         </div>
+                      </div>
 
-                        <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
-                          class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
-                          View Profile
-                        </a>
+                      <!-- Content above banner -->
+                      <div class="relative z-10 px-6 pt-20 sm:pt-24"> <!-- pad top to clear banner height -->
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                          <img :src="showAuthor?.avatar || fallbackAvatar" @error="$event.target.src = fallbackAvatar"
+                            alt=""
+                            class="relative z-10 h-20 w-20 rounded-full object-cover ring-4 ring-white dark:ring-neutral-900" />
+
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1">
+                              <h1 class="text-xl font-semibold tracking-tight text-gray-900 dark:text-white truncate">
+                                <span x-text="showAuthor?.displayName || showAuthor?.handle || 'Unknown'"></span>
+                              </h1>
+                              <!-- green check icon inline (no text) -->
+                              <template
+                                x-if="(showAuthor?.verifications || []).some(v => v?.isValid)
+                  || ((showAuthor?.verifiedStatus || showAuthor?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                  class="h-4 w-4 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24"
+                                  fill="currentColor" aria-label="Verified account" role="img">
+                                  <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                              </template>
+                            </div>
+
+                            <div
+                              class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                              <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
+                                class="hover:underline" x-text="'@' + (showAuthor?.handle || 'unknown')"></a>
+                              <span class="hidden sm:inline">•</span>
+                              <span class="truncate" :title="showAuthor?.did" x-text="showAuthor?.did"></span>
+                            </div>
+                          </div>
+
+                          <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
+                            View Profile
+                          </a>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
 
-                  <!-- Bio -->
-                  <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
-                    x-text="tweet.author.description || ''"></div>
+                    <!-- Bio -->
+                    <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
+                      x-text="showAuthor?.description || ''"></div>
 
-                  <!-- Quick facts -->
-                  <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div
-                      class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                      <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Followers</dt>
-                      <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                        x-text="formatNum(tweet.author.followersCount)"></dd>
-                    </div>
-                    <div
-                      class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                      <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Following</dt>
-                      <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                        x-text="formatNum(tweet.author.followsCount)"></dd>
-                    </div>
-                    <div
-                      class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                      <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Posts</dt>
-                      <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                        x-text="formatNum(tweet.author.postsCount)"></dd>
-                    </div>
-                    <div
-                      class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                      <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Member Since</dt>
-                      <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                        x-text="formatDate(tweet.author.createdAt)"></dd>
-                    </div>
-                  </dl>
+                    <!-- Quick facts -->
+                    <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div
+                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Followers</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                          x-text="formatNum(showAuthor?.followersCount)"></dd>
+                      </div>
+                      <div
+                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Following</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                          x-text="formatNum(showAuthor?.followsCount)"></dd>
+                      </div>
+                      <div
+                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Posts</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                          x-text="formatNum(showAuthor?.postsCount)"></dd>
+                      </div>
+                      <div
+                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Member Since</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                          x-text="formatDate(showAuthor?.createdAt)"></dd>
+                      </div>
+                    </dl>
 
-                  <!-- Additional meta -->
-                  <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div
-                      class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
-                      <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Verification</h3>
-                      <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                        <li><span class="font-medium">Status:</span> <span
-                            x-text="tweet.author.verification?.verifiedStatus || 'none'"></span></li>
-                        <li><span class="font-medium">Trusted Verifier:</span> <span
-                            x-text="tweet.author.verification?.trustedVerifierStatus || 'no'"></span></li>
-                        <template x-if="(tweet.author.verification?.verifications || []).length">
-                          <li class="mt-1">
-                            <span class="font-medium">Verifiers:</span>
-                            <ul class="mt-1 list-disc list-inside space-y-0.5">
-                              <template x-for="v in tweet.verifiers" :key="v.did">
-                                <li>
-                                  <span x-text="v.handle || 'unknown'"></span>
-                                </li>
-                              </template>
-                            </ul>
+                    <!-- Additional meta -->
+                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div
+                        class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Verification</h3>
+                        <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                          <li><span class="font-medium">Status:</span> <span
+                              x-text="showAuthor?.verification?.verifiedStatus || 'none'"></span></li>
+                          <li><span class="font-medium">Trusted Verifier:</span> <span
+                              x-text="showAuthor?.verification?.trustedVerifierStatus || 'no'"></span></li>
+                          <template x-if="(showAuthor?.verification?.verifications || []).length">
+                            <li class="mt-1">
+                              <span class="font-medium">Verifiers:</span>
+                              <ul class="mt-1 list-disc list-inside space-y-0.5">
+                                <template x-for="v in tweet.verifiers" :key="v.did">
+                                  <li>
+                                    <span x-text="v.handle || 'unknown'"></span>
+                                  </li>
+                                </template>
+                              </ul>
+                            </li>
+                          </template>
+                        </ul>
+                      </div>
+
+                      <div
+                        class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Stats & Flags</h3>
+                        <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                          <li><span class="font-medium">Lists:</span> <span
+                              x-text="showAuthor?.associated?.lists"></span>
                           </li>
-                        </template>
-                      </ul>
+                          <li><span class="font-medium">Starter Packs:</span> <span
+                              x-text="showAuthor?.associated?.starterPacks"></span>
+                          </li>
+                          <li><span class="font-medium">Feedgens:</span> <span
+                              x-text="showAuthor?.associated?.feedgens"></span></li>
+                          <li><span class="font-medium">Labeler:</span> <span
+                              x-text="showAuthor?.labeler ? 'yes' : 'no'"></span>
+                          </li>
+                          <li><span class="font-medium">Allow Incoming:</span> <span
+                              x-text="showAuthor?.associated?.chat?.allowIncoming || '—'"></span></li>
+                          <li><span class="font-medium">Allow Subscriptions:</span> <span
+                              x-text="showAuthor?.associated?.activitySubscription?.allowSubscriptions || '—'"></span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <template x-if="showAuthor?.viewer">
+                        <div
+                          class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
+                          <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Viewer</h3>
+                          <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                            <li><span class="font-medium">Blocks you:</span> <span
+                                x-text="showAuthor.viewer.blockedBy ? 'yes' : 'no'"></span></li>
+                            <li><span class="font-medium">Mutes you:</span> <span
+                                x-text="showAuthor.viewer.muted ? 'yes' : 'no'"></span></li>
+                            <li><span class="font-medium">Mutes your quote posts:</span> <span
+                                x-text="showAuthor.viewer.mutedOnlyQuoteposts ? 'yes' : 'no'"></span></li>
+                            <li><span class="font-medium">Mute your reposts:</span> <span
+                                x-text="showAuthor.viewer.mutedOnlyReposts ? 'yes' : 'no'"></span></li>
+                          </ul>
+
+                          <template x-if="showAuthor.viewer.knownFollowers?.followers?.length">
+                            <div class="mt-4 border-t border-gray-200 pt-3 dark:border-neutral-700">
+                              <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                                Followed by
+                                <span class="text-gray-500 dark:text-gray-400"
+                                  x-text="`(${showAuthor.viewer.knownFollowers.count ?? showAuthor.viewer.knownFollowers.followers.length})`"></span>
+                              </h4>
+                              <ul class="mt-2 space-y-2">
+                                <template x-for="knownFollower in showAuthor.viewer.knownFollowers.followers"
+                                  :key="knownFollower.did">
+                                  <li>
+                                    <a :href="`https://bsky.app/profile/${knownFollower.handle || knownFollower.did}`"
+                                      target="_blank" rel="noopener noreferrer"
+                                      class="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-50 dark:hover:bg-neutral-800">
+                                      <img :src="knownFollower.avatar || fallbackAvatar"
+                                        @error="$event.target.src = fallbackAvatar" alt=""
+                                        class="h-8 w-8 shrink-0 rounded-full object-cover" />
+                                      <span class="min-w-0">
+                                        <span class="block truncate text-sm font-medium text-gray-900 dark:text-white"
+                                          x-text="knownFollower.displayName || knownFollower.handle || 'Unknown'"></span>
+                                        <span class="block truncate text-xs text-gray-500 dark:text-gray-400"
+                                          x-text="'@' + (knownFollower.handle || knownFollower.did)"></span>
+                                      </span>
+                                    </a>
+                                  </li>
+                                </template>
+                              </ul>
+                            </div>
+                          </template>
+                        </div>
+                      </template>
                     </div>
 
-                    <div
-                      class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
-                      <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Stats & Flags</h3>
-                      <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                        <li><span class="font-medium">Lists:</span> <span
-                            x-text="tweet.author.associated?.lists"></span>
-                        </li>
-                        <li><span class="font-medium">Starter Packs:</span> <span
-                            x-text="tweet.author.associated?.starterPacks"></span>
-                        </li>
-                        <li><span class="font-medium">Feedgens:</span> <span
-                            x-text="tweet.author.associated?.feedgens"></span></li>
-                        <li><span class="font-medium">Labeler:</span> <span
-                            x-text="tweet.author.labeler ? 'yes' : 'no'"></span>
-                        </li>
-                        <li><span class="font-medium">Allow Incoming:</span> <span
-                            x-text="tweet.author.associated?.chat?.allowIncoming || '—'"></span></li>
-                        <li><span class="font-medium">Allow Subscriptions:</span> <span
-                            x-text="tweet.author.associated?.activitySubscription?.allowSubscriptions || '—'"></span>
-                        </li>
-                      </ul>
+                    <!-- Footer -->
+                    <div class="mt-6 flex flex-wrap gap-2">
+                      <template x-if="showAuthor?.indexedAt">
+                        <span
+                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
+                          Indexed: <span class="ml-1" x-text="formatDateTime(showAuthor?.indexedAt)"></span>
+                        </span>
+                      </template>
+                      <template x-if="showAuthor?.refreshTime">
+                        <span
+                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
+                          Refreshed: <span class="ml-1" x-text="formatDateTime(showAuthor?.refreshTime)"></span>
+                        </span>
+                      </template>
                     </div>
-                  </div>
-
-                  <!-- Footer -->
-                  <div class="mt-6 flex flex-wrap gap-2">
-                    <template x-if="tweet.author.indexedAt">
-                      <span
-                        class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
-                        Indexed: <span class="ml-1" x-text="formatDateTime(tweet.author.indexedAt)"></span>
-                      </span>
-                    </template>
-                    <template x-if="tweet.author.refreshTime">
-                      <span
-                        class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
-                        Refreshed: <span class="ml-1" x-text="formatDateTime(tweet.author.refreshTime)"></span>
-                      </span>
-                    </template>
-                  </div>
-                </article>
+                  </article>
+                </div>
               </div>
 
               <!-- Parent Tweet -->
@@ -447,9 +474,9 @@
                     <!-- Parent Tweet Content -->
                     <div class="flex-1 min-w-0">
                       <p class="font-semibold text-gray-600 dark:text-gray-300">
-                        <span x-text="tweet.parent.userName || 'Anonymous'"></span>
+                        <span x-text="tweet.parent.displayName || 'Anonymous'"></span>
                         <span class="text-sm text-gray-500 dark:text-gray-400"
-                          x-text="'@' + (tweet.parent.userHandle || 'anonymous')"></span>
+                          x-text="'@' + (tweet.parent.handle || 'anonymous')"></span>
                       </p>
                     </div>
                   </div>
@@ -463,22 +490,24 @@
 
               <!-- Main Tweet -->
 
-              <div x-show="!menu.showOnlyAuthorProfile" x-cloak class="flex justify-between items-start mb-2">
-                <!-- Left section (avatar, username, handle) -->
-                <div class="flex items-center">
+              <div class="flex justify-between items-start mb-2">
+                <!-- Left section (avatar, displayName, handle) -->
+                <div class="flex min-w-0 flex-1 items-center">
                   <!-- Avatar -->
-                  <a :href="tweet.profileUrl" target="_blank" class="mr-4 flex-shrink-0">
+                  <button type="button" @click="loadAuthorProfile(tweet.author?.did)"
+                    class="mr-4 flex-shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                    :aria-label="`Show profile for ${tweet.displayName || tweet.handle}`">
                     <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
                       class="w-8 h-8 rounded-full" />
-                  </a>
+                  </button>
 
                   <!-- Name and handle (vertically centered) -->
-                  <div class="flex flex-col justify-center">
+                  <div class="flex min-w-0 flex-col justify-center">
                     <!-- name + check inline -->
-                    <div class="flex items-center gap-1">
+                    <div class="flex min-w-0 items-center gap-1">
                       <a :href="tweet.profileUrl" target="_blank"
-                        class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
-                        x-text="tweet.userName"></a>
+                        class="min-w-0 font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                        style="overflow-wrap: break-word;" x-text="tweet.displayName"></a>
 
                       <!-- green check, no text -->
                       <template
@@ -491,7 +520,7 @@
                       </template>
                     </div>
 
-                    <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.handle"></p>
                   </div>
 
                 </div>
@@ -499,8 +528,6 @@
                 <!-- Right section (timestamp), aligned to top -->
                 <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
               </div>
-
-              <p x-show="menu.showOnlyAuthorProfile" class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
 
               <!-- Tweet Content (Full Width) -->
               <a :href="tweet.postUrl" target="_blank"
@@ -574,7 +601,8 @@
 
                     <div class="flex-1 min-w-0">
                       <p class="font-semibold text-gray-600 dark:text-gray-300">
-                        <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                        <span style="overflow-wrap: break-word;"
+                          x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
                         <span class="text-sm text-gray-500 dark:text-gray-400 ml-1"
                           x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
                       </p>
@@ -731,17 +759,16 @@
               <template x-if="tweet.uri === activeReply">
                 <div>
                   <div class="flex justify-between items-start mb-1.5">
-                    <div class="flex items-center">
-                      <a :href="tweet.profileUrl" target="_blank" class="mr-4 flex-shrink-0">
-                        <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
-                          class="w-6 h-6 rounded-full" />
-                      </a>
+                    <div class="flex min-w-0 flex-1 items-center">
+                      <div type="button" @click="loadAuthorProfile(tweet.author?.did)" class="mr-4 flex-shrink-0">
+                        <img :src="tweet.avatar" alt="Avatar" class="w-6 h-6 rounded-full" />
+                      </div>
 
-                      <div class="flex flex-col justify-center">
-                        <div class="flex items-center gap-1">
+                      <div class="flex min-w-0 flex-col justify-center">
+                        <div class="flex min-w-0 items-center gap-1">
                           <a :href="tweet.profileUrl" target="_blank"
-                            class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
-                            x-text="tweet.userName"></a>
+                            class="min-w-0 font-semibold text-gray-800 dark:text-gray-200 hover:underline"
+                            style="overflow-wrap: break-word;" x-text="tweet.displayName"></a>
                           <template
                             x-if="(tweet.author?.verifications || []).some(v => v?.isValid) || ((tweet.author?.verifiedStatus || tweet.author?.verification?.verifiedStatus || '').toLowerCase() === 'valid')">
                             <svg xmlns="http://www.w3.org/2000/svg"
@@ -752,7 +779,7 @@
                           </template>
                         </div>
 
-                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.handle"></p>
                       </div>
                     </div>
 
@@ -826,7 +853,8 @@
                         class="w-6 h-6 rounded-full mr-3" />
                       <div class="flex-1">
                         <p class="font-semibold text-gray-600 dark:text-gray-300">
-                          <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                          <span style="overflow-wrap: break-word;"
+                            x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
                           <span class="text-sm text-gray-500 dark:text-gray-400"
                             x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
                         </p>
@@ -899,19 +927,19 @@
 
               <template x-if="tweet.uri !== activeReply">
                 <div class="mt-1 flex items-start px-2 py-1.5">
-                  <a :href="tweet.profileUrl" target="_blank" class="mr-3">
+                  <div type="button" @click="loadAuthorProfile(tweet.author.did)" class="mr-3">
                     <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
                       class="w-6 h-6 rounded-full" />
-                  </a>
+                  </div>
 
-                  <div class="flex-1">
+                  <div class="min-w-0 flex-1">
                     <p class="font-semibold text-gray-600 dark:text-gray-300">
                       <span>
                         <a :href="tweet.profileUrl" target="_blank"
                           class="font-semibold text-gray-800 dark:text-gray-200 hover:underline"
-                          x-text="tweet.userName"></a>
+                          style="overflow-wrap: break-word;" x-text="tweet.displayName"></a>
                       </span>
-                      <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.userHandle"></span>
+                      <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.handle"></span>
                     </p>
                     <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
 
@@ -981,7 +1009,8 @@
                           class="w-6 h-6 rounded-full mr-3" />
                         <div class="flex-1">
                           <p class="font-semibold text-gray-600 dark:text-gray-300">
-                            <span x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
+                            <span style="overflow-wrap: break-word;"
+                              x-text="tweet.quotePost.author.displayName || 'Anonymous'"></span>
                             <span class="text-sm text-gray-500 dark:text-gray-400"
                               x-text="'@' + (tweet.quotePost.author.handle || 'anonymous')"></span>
                           </p>
@@ -1173,8 +1202,17 @@
   </div>
   <script src="./oauth/client.js"></script>
   <script>
+    const fallbackAvatar = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <rect width="100" height="100" fill="#e5e7eb"/>
+        <circle cx="50" cy="38" r="19" fill="#9ca3af"/>
+        <path d="M17 100c2-23 15-36 33-36s31 13 33 36" fill="#9ca3af"/>
+      </svg>
+    `)}`;
+
     function tweetFeed() {
       return {
+        fallbackAvatar,
         tweets: [],
         allPosts: [],
         websocket: null,
@@ -1200,6 +1238,7 @@
         loadingFeedList: false,
         showModalReplies: false,
         showLoginModal: false,
+        showAuthor: null,
         activeImageAlt: "",
         replies: [], // will be set only when modal for one post is open
         rawReplies: [],
@@ -1224,8 +1263,8 @@
 
           return tweets.filter(tweet => [
             tweet.content,
-            tweet.userName,
-            tweet.userHandle,
+            tweet.displayName,
+            tweet.handle,
           ].some(value => String(value || "").toLowerCase().includes(query)));
         },
         rkeyMap: new Map(),
@@ -1236,7 +1275,6 @@
           showChart: false,
           showAllLanguages: false,
           showLabeled: false,
-          showOnlyAuthorProfile: false,
           noBigAccounts: false,
           autoPlayVideo: false,
           showDots: false
@@ -1253,9 +1291,42 @@
 
           this.loadAuthSession()
           this.addVisibilityListeners();
+          const postUri = new URLSearchParams(window.location.search).get("postUri");
+          if (postUri) {
+            await this.loadPostUri(postUri);
+          }
           this.startWebsocket();
           this.chartIt()
 
+        },
+        async loadPostUri(postUri) {
+          this.selectedFeed = -1;
+          this.showOnlyUri = postUri;
+
+          try {
+            const { post, replies } = (await this.getPostThread(postUri, 2))?.thread;
+
+            if (!post) {
+              console.warn("Post not found", postUri);
+              this.tweets = [];
+              return;
+            }
+            const tweet = await this.transformPost(post, 0, post.author, post.verifiers);
+            tweet.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
+
+            this.likeTracker[postUri] = tweet;
+            this.allPosts = [tweet];
+            this.tweets = [tweet];
+            await this.loadVideoInLikeTracker(postUri);
+
+            this.$nextTick(() => {
+              this.postIntersectionObserver(document.querySelectorAll('.post'));
+              this.videoIntersectionObserver(document.querySelectorAll('.f-video'));
+            });
+          } catch (error) {
+            console.error("Unable to load post from postUri", error);
+            this.tweets = [];
+          }
         },
         async getFeedList(item, index, limit, oldCursor) {
           if (item.type == 'feed') {
@@ -1292,7 +1363,7 @@
           const feedsString = JSON.stringify(feeds)
           localStorage.setItem("feeds", feedsString)
         },
-         saveFeedPrefs(feedPrefs) {
+        saveFeedPrefs(feedPrefs) {
           const feedsString = JSON.stringify(feedPrefs)
           localStorage.setItem("feedPrefs", feedsString)
         },
@@ -1318,7 +1389,7 @@
           }
           try {
             const prefs = await getPreferences(this.auth.session);
-            // console.log({ prefs })
+            console.log({ prefs })
             const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2");
             // console.log({ feeds });
             this.saveFeedPrefs(prefs)
@@ -1478,8 +1549,6 @@
           }
         },
         async getAuthorThread(thread) {
-          // console.log("getAuthorThread", thread)
-
           let parent = thread.parent;
           while (parent) {
             this.rawReplies.unshift(parent);
@@ -1488,10 +1557,17 @@
           let current = thread;
           while (current) {
             this.rawReplies.push(current);
-            const { post, replies } = current
-            const authorReply = replies?.find(reply => reply.post.author.did == post.author.did)
+            const { post, replies } = current;
+            const replyCount = post?.replyCount;
+            let gatheredReplies = replies
+            if (!replies?.length && replyCount > 0) {
+              const res = (await this.getPostThread(post.uri))
+              gatheredReplies = res?.thread?.replies
+            }
+            const authorReply = gatheredReplies?.find(reply => reply.post.author.did == post.author.did)
             current = authorReply;
           }
+          console.log(this.rawReplies)
         },
         async loadQuotes(uri) {
           // this.activeReply = uri;
@@ -1515,13 +1591,21 @@
             this.loadingReplies = false;
           }
         },
+        async loadAuthorProfile(did) {
+          let authorProfile = await db.authors.get({ did })
+          if (!authorProfile || this.auth.session && !authorProfile?.viewer) {
+            authorProfile = await this.getProfile(did);
+          }
+          console.log("loading author profile", authorProfile);
+          this.showAuthor = authorProfile;
+        },
         async loadAuthorThread(uri) {
           this.activeReply = uri;
           this.loadingReplies = true;
           try {
             this.rawReplies = []
             this.replies = [];
-            const res = await this.getPostThread(uri, 100);
+            const res = await this.getPostThread(uri, 100, false);
             await this.getAuthorThread(res.thread)
             //this breaks if the post's index is greater than the number of replies
             const newReplies = await Promise.all(this.rawReplies.map((r, i) => this.transformReplyRecordToPost(r, i)));
@@ -1755,6 +1839,12 @@
           });
         },
         resetTweets() {
+          const postUri = new URLSearchParams(window.location.search).get("postUri");
+          if (postUri) {
+            this.showOnlyUri = postUri;
+            this.tweets = [this.likeTracker[postUri]].filter(Boolean);
+            return;
+          }
           this.showOnlyUri = undefined;
           this.loadVisibleTweets(this.menu.sortField);
         },
@@ -1782,7 +1872,7 @@
           let postSave = await db.posts.get({ cid })
           if (!postSave) {
             postSave = (await this.getPosts(uri))?.posts[0];
-            console.log({ postSave })
+            // console.log({ postSave })
             db.posts.add({ ...postSave, refreshTime: Date.now() })
           } else {
             console.log("post exists", postSave)
@@ -1803,8 +1893,8 @@
             const showPost = labels.every(label => this.isLabelShown(label.val));
             if (!showPost) return
           }
-          const { handle, avatar, displayName } = author || {};
-          let authorSave = await db.authors.get({ handle })
+          const { handle, avatar, displayName, did } = author || {};
+          let authorSave = await db.authors.get({ did })
           //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
           if (!authorSave) { //refresh time over 24 hours ago
             const authorProfile = await this.getProfile(repo);
@@ -1900,8 +1990,11 @@
             this.numSeconds = tBegin > 60 ? 60 : tBegin;
             const { subject, createdAt, $type } = record || {};
             const { cid: likeCid, uri } = subject || {};
-            if (!this.likeTracker[uri]?.timesUs?.length) {
+            if (!this.likeTracker[uri]) {
               this.likeTracker[uri] = { trackedLikeCount: 0, timesUs: [] };
+            } else {
+              this.likeTracker[uri].trackedLikeCount ??= 0;
+              this.likeTracker[uri].timesUs ??= [];
             }
 
             this.likeTracker[uri].cid = likeCid;
@@ -1971,7 +2064,7 @@
                 .filter((r) => r.content)
                 .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
 
-              // const dbput = tweets.map(t => ({ likeHistoryLength: t.likeHistoryLength, link: t.link, likesPerSecond: t.likesPerSecond, author: t.userHandle }))
+              // const dbput = tweets.map(t => ({ likeHistoryLength: t.likeHistoryLength, link: t.link, likesPerSecond: t.likesPerSecond, author: t.handle }))
               // db.trackedLikes.bulkPut(dbput).then(() => {
               //   // console.log("Done adding 100,000 raindrops all over the place");
               // }).catch(error => {
@@ -1990,7 +2083,7 @@
               this.trackedLength = tweets.length;
 
               if (this.showOnlyUri) {
-                this.tweets = [this.likeTracker[this.showOnlyUri]]
+                this.tweets = [this.likeTracker[this.showOnlyUri]].filter(Boolean)
               } else if (this.selectedFeed > -1) {
                 this.tweets = this.feeds[this.selectedFeed].posts
               } else {
@@ -1998,7 +2091,7 @@
 
               }
 
-              const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.userHandle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
+              const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.handle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
               // // console.log({ series })
               this.chart.updateSeries(series);
             }
@@ -2050,9 +2143,9 @@
             bookmarkCount,
             createdAt: record.createdAt,
             content: record.text,
-            userHandle: handle,
-            userName: author.displayName,
-            avatar: author.avatar,
+            handle,
+            displayName,
+            avatar,
             postorder: postorder,
             postUrl: `https://bsky.app/profile/${handle}/post/${rkey}`,
             profileUrl: `https://bsky.app/profile/${handle}`,
@@ -2216,7 +2309,6 @@
           const profile = await this.apiRequest(
             "app.bsky.actor.getProfile",
             queryParams,
-            true
           );
           return profile;
         },
@@ -2231,13 +2323,13 @@
           return res;
         },
         //todo add authenticated getActorLikes?
-        async getPostThread(uri, depth = 6) {
+        async getPostThread(uri, depth = 6, forcePublic = true) {
           const queryParams = new URLSearchParams({ uri, depth }).toString();
           //todo after adding the like button to replies switch to not force public
           const posts = await this.apiRequest(
             "app.bsky.feed.getPostThread",
             queryParams,
-            true
+            forcePublic
           );
           return posts;
         },

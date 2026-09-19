@@ -272,7 +272,7 @@
                 <div x-show="!!showAuthor" x-cloak @keydown.escape.window="showAuthor = null"
                   class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
                   role="dialog" aria-modal="true" aria-label="Author profile">
-                  <article @click.outside="showAuthor = null"
+                  <article @click.outside="if (!showModalReplies) showAuthor = null"
                     class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6 rounded-2xl border border-gray-200 bg-white shadow-2xl dark:bg-neutral-900 dark:border-neutral-800">
                     <button type="button" @click="showAuthor = null"
                       class="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-2xl leading-none text-gray-600 shadow hover:bg-white hover:text-gray-900 dark:bg-neutral-800/90 dark:text-gray-300 dark:hover:bg-neutral-700 dark:hover:text-white"
@@ -493,7 +493,7 @@
                 <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-1.5">
                   <!-- Parent Tweet Avatar -->
                   <div class="flex items-center">
-                    <img :src="tweet.parent.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                    <img :src="tweet.parent.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Reply Avatar"
                       class="w-6 h-6 rounded-full mr-3" />
                     <!-- Parent Tweet Content -->
                     <div class="flex-1 min-w-0">
@@ -521,7 +521,7 @@
                   <button type="button" @click="loadAuthorProfile(tweet.author?.did)"
                     class="mr-4 flex-shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                     :aria-label="`Show profile for ${tweet.displayName || tweet.handle}`">
-                    <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
+                    <img :src="tweet.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Avatar"
                       class="w-8 h-8 rounded-full" />
                   </button>
 
@@ -883,7 +883,7 @@
                   <template x-if="tweet.quotePost">
                     <div @click="loadReplies(tweet.quotePost.uri); showModalReplies = true"
                       class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
-                      <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                      <img :src="tweet.quotePost.author.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Reply Avatar"
                         class="w-6 h-6 rounded-full mr-3" />
                       <div class="flex-1">
                         <p class="font-semibold text-gray-600 dark:text-gray-300">
@@ -962,7 +962,7 @@
               <template x-if="tweet.uri !== activeReply">
                 <div class="mt-1 flex items-start px-2 py-1.5">
                   <div type="button" @click="loadAuthorProfile(tweet.author.did)" class="mr-3">
-                    <img :src="tweet.avatar || 'https://via.placeholder.com/50'" alt="Avatar"
+                    <img :src="tweet.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Avatar"
                       class="w-6 h-6 rounded-full" />
                   </div>
 
@@ -1039,7 +1039,7 @@
                     <template x-if="tweet.quotePost">
                       <div @click="loadReplies(tweet.quotePost.uri); showModalReplies = true"
                         class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mt-1.5 flex items-start">
-                        <img :src="tweet.quotePost.author.avatar || 'https://via.placeholder.com/50'" alt="Reply Avatar"
+                        <img :src="tweet.quotePost.author.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Reply Avatar"
                           class="w-6 h-6 rounded-full mr-3" />
                         <div class="flex-1">
                           <p class="font-semibold text-gray-600 dark:text-gray-300">
@@ -1630,7 +1630,7 @@
         },
         async loadAuthorProfile(did) {
           let authorProfile = await db.authors.get({ did })
-          if (!authorProfile || this.auth.session && !authorProfile?.viewer) {
+          if (!authorProfile || (this.auth.session && !authorProfile?.viewer)) {
             authorProfile = await this.getProfile(did);
           }
           console.log("loading author profile", authorProfile);
@@ -1644,7 +1644,7 @@
               this.rawReplies = []
               this.replies = [];
             }
-            const res = await this.getAuthorFeed(handle, 50, this.showAuthor.cursor);
+            const res = await this.getAuthorFeed(handle, 50, this.showAuthor?.cursor);
             console.log("author feed", res)
             if (!res?.feed) {
               throw new Error("no posts")

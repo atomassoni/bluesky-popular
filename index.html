@@ -11,10 +11,16 @@
   <script type="module">
     // Import Dexie
     import { Dexie } from 'https://unpkg.com/dexie/dist/modern/dexie.mjs';
-
     const db = new Dexie('BlueskyDatabase');
     db.version(1).stores({
-
+      authors: '++id, did, refreshTime',
+      verifiers: '++id, did, refreshTime',
+      posts: "++id, cid, refreshTime",
+      videos: "++id, cid, refreshTime",
+      images: "++id, cid, refreshTime",
+      trackedLikes: "link",
+    });
+    db.version(2).stores({
       authors: '++id, did, refreshTime',
       verifiers: '++id, did, refreshTime',
       posts: "++id, cid, refreshTime",
@@ -22,7 +28,15 @@
       images: "++id, cid, refreshTime",
       trackedLikes: "link",
       seenPosts: "&uri, viewedAt",
-    })
+    }).upgrade(async transaction => {
+      const viewedPosts = await transaction.table('posts')
+        .filter(post => post.viewCount > 0 && Boolean(post.uri))
+        .toArray()
+      await transaction.table('seenPosts').bulkPut(viewedPosts.map(post => ({
+        uri: post.uri,
+        viewedAt: post.refreshTime || Date.now(),
+      })))
+    });
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
@@ -310,160 +324,170 @@
 
                           <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
                             class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
-                            View Profile
+                            See on Bsky
                           </a>
+                          <div @click="loadAuthorFeed(showAuthor?.handle); showModalReplies = true"
+                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
+                            View Posts
+                          </div>
                         </div>
                       </div>
-                    </div>
 
 
-                    <!-- Bio -->
-                    <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
-                      x-text="showAuthor?.description || ''"></div>
+                      <!-- Bio -->
+                      <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
+                        x-text="showAuthor?.description || ''"></div>
 
-                    <!-- Quick facts -->
-                    <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div
-                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Followers</dt>
-                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                          x-text="formatNum(showAuthor?.followersCount)"></dd>
-                      </div>
-                      <div
-                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Following</dt>
-                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                          x-text="formatNum(showAuthor?.followsCount)"></dd>
-                      </div>
-                      <div
-                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Posts</dt>
-                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                          x-text="formatNum(showAuthor?.postsCount)"></dd>
-                      </div>
-                      <div
-                        class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
-                        <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Member Since</dt>
-                        <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
-                          x-text="formatDate(showAuthor?.createdAt)"></dd>
-                      </div>
-                    </dl>
+                      <!-- Quick facts -->
+                      <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div
+                          class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                          <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Followers</dt>
+                          <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                            x-text="formatNum(showAuthor?.followersCount)"></dd>
+                        </div>
+                        <div
+                          class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                          <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Following</dt>
+                          <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                            x-text="formatNum(showAuthor?.followsCount)"></dd>
+                        </div>
+                        <div
+                          class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                          <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Posts</dt>
+                          <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                            x-text="formatNum(showAuthor?.postsCount)"></dd>
+                        </div>
+                        <div
+                          class="rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 dark:bg-neutral-800 dark:ring-neutral-700">
+                          <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Member Since</dt>
+                          <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"
+                            x-text="formatDate(showAuthor?.createdAt)"></dd>
+                        </div>
+                      </dl>
 
-                    <!-- Additional meta -->
-                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div
-                        class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
-                        <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Verification</h3>
-                        <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                          <li><span class="font-medium">Status:</span> <span
-                              x-text="showAuthor?.verification?.verifiedStatus || 'none'"></span></li>
-                          <li><span class="font-medium">Trusted Verifier:</span> <span
-                              x-text="showAuthor?.verification?.trustedVerifierStatus || 'no'"></span></li>
-                          <template x-if="(showAuthor?.verification?.verifications || []).length">
-                            <li class="mt-1">
-                              <span class="font-medium">Verifiers:</span>
-                              <ul class="mt-1 list-disc list-inside space-y-0.5">
-                                <template x-for="v in tweet.verifiers" :key="v.did">
-                                  <li>
-                                    <span x-text="v.handle || 'unknown'"></span>
-                                  </li>
-                                </template>
-                              </ul>
-                            </li>
-                          </template>
-                        </ul>
-                      </div>
-
-                      <div
-                        class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
-                        <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Stats & Flags</h3>
-                        <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                          <li><span class="font-medium">Lists:</span> <span
-                              x-text="showAuthor?.associated?.lists"></span>
-                          </li>
-                          <li><span class="font-medium">Starter Packs:</span> <span
-                              x-text="showAuthor?.associated?.starterPacks"></span>
-                          </li>
-                          <li><span class="font-medium">Feedgens:</span> <span
-                              x-text="showAuthor?.associated?.feedgens"></span></li>
-                          <li><span class="font-medium">Labeler:</span> <span
-                              x-text="showAuthor?.labeler ? 'yes' : 'no'"></span>
-                          </li>
-                          <li><span class="font-medium">Allow Incoming:</span> <span
-                              x-text="showAuthor?.associated?.chat?.allowIncoming || '—'"></span></li>
-                          <li><span class="font-medium">Allow Subscriptions:</span> <span
-                              x-text="showAuthor?.associated?.activitySubscription?.allowSubscriptions || '—'"></span>
-                          </li>
-                        </ul>
-                      </div>
-
-                      <template x-if="showAuthor?.viewer">
+                      <!-- Additional meta -->
+                      <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div
                           class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
-                          <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Viewer</h3>
+                          <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Verification</h3>
                           <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                            <li><span class="font-medium">Blocks you:</span> <span
-                                x-text="showAuthor.viewer.blockedBy ? 'yes' : 'no'"></span></li>
-                            <li><span class="font-medium">Mutes you:</span> <span
-                                x-text="showAuthor.viewer.muted ? 'yes' : 'no'"></span></li>
-                            <li><span class="font-medium">Mutes your quote posts:</span> <span
-                                x-text="showAuthor.viewer.mutedOnlyQuoteposts ? 'yes' : 'no'"></span></li>
-                            <li><span class="font-medium">Mute your reposts:</span> <span
-                                x-text="showAuthor.viewer.mutedOnlyReposts ? 'yes' : 'no'"></span></li>
+                            <li><span class="font-medium">Status:</span> <span
+                                x-text="showAuthor?.verification?.verifiedStatus || 'none'"></span></li>
+                            <li><span class="font-medium">Trusted Verifier:</span> <span
+                                x-text="showAuthor?.verification?.trustedVerifierStatus || 'no'"></span></li>
+                            <template x-if="(showAuthor?.verification?.verifications || []).length">
+                              <li class="mt-1">
+                                <span class="font-medium">Verifiers:</span>
+                                <ul class="mt-1 list-disc list-inside space-y-0.5">
+                                  <template x-for="v in tweet.verifiers" :key="v.did">
+                                    <li>
+                                      <span x-text="v.handle || 'unknown'"></span>
+                                    </li>
+                                  </template>
+                                </ul>
+                              </li>
+                            </template>
                           </ul>
-
-                          <template x-if="showAuthor.viewer.knownFollowers?.followers?.length">
-                            <div class="mt-4 border-t border-gray-200 pt-3 dark:border-neutral-700">
-                              <h4 class="text-sm font-medium text-gray-900 dark:text-white">
-                                Followed by
-                                <span class="text-gray-500 dark:text-gray-400"
-                                  x-text="`(${showAuthor.viewer.knownFollowers.count ?? showAuthor.viewer.knownFollowers.followers.length})`"></span>
-                              </h4>
-                              <ul class="mt-2 space-y-2">
-                                <template x-for="knownFollower in showAuthor.viewer.knownFollowers.followers"
-                                  :key="knownFollower.did">
-                                  <li>
-                                    <a :href="`https://bsky.app/profile/${knownFollower.handle || knownFollower.did}`"
-                                      target="_blank" rel="noopener noreferrer"
-                                      class="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-50 dark:hover:bg-neutral-800">
-                                      <img :src="knownFollower.avatar || fallbackAvatar"
-                                        @error="$event.target.src = fallbackAvatar" alt=""
-                                        class="h-8 w-8 shrink-0 rounded-full object-cover" />
-                                      <span class="min-w-0">
-                                        <span class="block truncate text-sm font-medium text-gray-900 dark:text-white"
-                                          x-text="knownFollower.displayName || knownFollower.handle || 'Unknown'"></span>
-                                        <span class="block truncate text-xs text-gray-500 dark:text-gray-400"
-                                          x-text="'@' + (knownFollower.handle || knownFollower.did)"></span>
-                                      </span>
-                                    </a>
-                                  </li>
-                                </template>
-                              </ul>
-                            </div>
-                          </template>
                         </div>
-                      </template>
-                    </div>
 
-                    <!-- Footer -->
-                    <div class="mt-6 flex flex-wrap gap-2">
-                      <template x-if="showAuthor?.indexedAt">
-                        <span
-                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
-                          Indexed: <span class="ml-1" x-text="formatDateTime(showAuthor?.indexedAt)"></span>
-                        </span>
-                      </template>
-                      <template x-if="showAuthor?.refreshTime">
-                        <span
-                          class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
-                          Refreshed: <span class="ml-1" x-text="formatDateTime(showAuthor?.refreshTime)"></span>
-                        </span>
-                      </template>
-                    </div>
+                        <div
+                          class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
+                          <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Stats & Flags</h3>
+                          <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                            <li><span class="font-medium">Lists:</span> <span
+                                x-text="showAuthor?.associated?.lists"></span>
+                            </li>
+                            <li><span class="font-medium">Starter Packs:</span> <span
+                                x-text="showAuthor?.associated?.starterPacks"></span>
+                            </li>
+                            <li><span class="font-medium">Feedgens:</span> <span
+                                x-text="showAuthor?.associated?.feedgens"></span></li>
+                            <li><span class="font-medium">Labeler:</span> <span
+                                x-text="showAuthor?.labeler ? 'yes' : 'no'"></span>
+                            </li>
+                            <li><span class="font-medium">Allow Incoming:</span> <span
+                                x-text="showAuthor?.associated?.chat?.allowIncoming || '—'"></span></li>
+                            <li><span class="font-medium">Allow Subscriptions:</span> <span
+                                x-text="showAuthor?.associated?.activitySubscription?.allowSubscriptions || '—'"></span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <template x-if="showAuthor?.viewer">
+                          <div
+                            class="rounded-xl p-4 ring-1 ring-inset ring-gray-200 bg-white dark:bg-neutral-900 dark:ring-neutral-800">
+                            <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-2">Viewer</h3>
+                            <ul class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                              <li><span class="font-medium">Blocks you:</span> <span
+                                  x-text="showAuthor.viewer.blockedBy ? 'yes' : 'no'"></span></li>
+                              <li><span class="font-medium">Mutes you:</span> <span
+                                  x-text="showAuthor.viewer.muted ? 'yes' : 'no'"></span></li>
+                              <li><span class="font-medium">Mutes your quote posts:</span> <span
+                                  x-text="showAuthor.viewer.mutedOnlyQuoteposts ? 'yes' : 'no'"></span></li>
+                              <li><span class="font-medium">Mute your reposts:</span> <span
+                                  x-text="showAuthor.viewer.mutedOnlyReposts ? 'yes' : 'no'"></span></li>
+                            </ul>
+
+                            <template x-if="showAuthor.viewer.knownFollowers?.followers?.length">
+                              <div class="mt-4 border-t border-gray-200 pt-3 dark:border-neutral-700">
+                                <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                                  Followed by
+                                  <span class="text-gray-500 dark:text-gray-400"
+                                    x-text="`(${showAuthor.viewer.knownFollowers.count ?? showAuthor.viewer.knownFollowers.followers.length})`"></span>
+                                </h4>
+                                <ul class="mt-2 space-y-2">
+                                  <template x-for="knownFollower in showAuthor.viewer.knownFollowers.followers"
+                                    :key="knownFollower.did">
+                                    <li>
+                                      <a :href="`https://bsky.app/profile/${knownFollower.handle || knownFollower.did}`"
+                                        target="_blank" rel="noopener noreferrer"
+                                        class="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-50 dark:hover:bg-neutral-800">
+                                        <img :src="knownFollower.avatar || fallbackAvatar"
+                                          @error="$event.target.src = fallbackAvatar" alt=""
+                                          class="h-8 w-8 shrink-0 rounded-full object-cover" />
+                                        <span class="min-w-0">
+                                          <span class="block truncate text-sm font-medium text-gray-900 dark:text-white"
+                                            x-text="knownFollower.displayName || knownFollower.handle || 'Unknown'"></span>
+                                          <span class="block truncate text-xs text-gray-500 dark:text-gray-400"
+                                            x-text="'@' + (knownFollower.handle || knownFollower.did)"></span>
+                                        </span>
+                                      </a>
+                                    </li>
+                                  </template>
+                                </ul>
+                              </div>
+                            </template>
+                          </div>
+                        </template>
+                      </div>
+
+                      <!-- Footer -->
+                      <div class="mt-6 flex flex-wrap gap-2">
+                        <template x-if="showAuthor?.indexedAt">
+                          <span
+                            class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
+                            Indexed: <span class="ml-1" x-text="formatDateTime(showAuthor?.indexedAt)"></span>
+                          </span>
+                        </template>
+                        <template x-if="showAuthor?.refreshTime">
+                          <span
+                            class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ring-gray-200 text-gray-700 bg-gray-50 dark:bg-neutral-800 dark:text-gray-200 dark:ring-neutral-700">
+                            Refreshed: <span class="ml-1" x-text="formatDateTime(showAuthor?.refreshTime)"></span>
+                          </span>
+                        </template>
+                      </div>
                   </article>
                 </div>
               </div>
+              <template x-if="tweet.parentMissingMessage">
+                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-1.5">
+                  <div class="mt-1">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1" x-text="tweet.parentMissingMessage"></p>
+                  </div>
+                </div>
 
+              </template>
               <!-- Parent Tweet -->
               <template x-if="tweet.parent">
                 <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-1.5">
@@ -731,15 +755,15 @@
     </template>
     <!-- Modal overlay -->
     <div x-show="showModalReplies" x-cloak
-      class="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+      class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <!-- Modal box -->
       <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
              rounded-xl shadow-2xl w-full max-w-lg p-5 border border-gray-200 dark:border-gray-700">
         <!-- Header -->
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">
-            Thread
-            <span x-text="`${replies.length} / ${rawReplies.length}`"></span>
+            Posts Loaded
+            <span x-text="`${replies.length} / ${rawReplies.length}${showAuthor?.cursor?'+':''}`"></span>
           </h2>
           <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             @click="showModalReplies = false">
@@ -749,13 +773,23 @@
 
         <!-- Loading state -->
         <div x-show="loadingReplies" class="text-sm text-gray-500 dark:text-gray-400">
-          Loading replies…
+          Loading more…
         </div>
         <!-- Replies -->
         <ul x-show="!loadingReplies" class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
           @scroll="maybeLoadMore($el)">
           <template x-for="tweet in replies" :key="tweet.cid">
             <li class="py-2">
+              <template x-if="tweet.repostInfo">
+                <div class="mb-1.5 flex items-center gap-1.5 px-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span aria-hidden="true">&#8635;</span>
+                  <span>Reposted by</span>
+                  <a :href="`https://bsky.app/profile/${tweet.repostInfo.handle}`" target="_blank"
+                    rel="noopener noreferrer" class="font-medium hover:underline"
+                    x-text="tweet.repostInfo.displayName || `@${tweet.repostInfo.handle}`"></a>
+                  <span x-show="tweet.repostInfo.displayName" x-text="`@${tweet.repostInfo.handle}`"></span>
+                </div>
+              </template>
               <template x-if="tweet.uri === activeReply">
                 <div>
                   <div class="flex justify-between items-start mb-1.5">
@@ -1381,6 +1415,8 @@
           this.feeds = [...loadedFeeds]
           this.saveFeeds(this.feeds)
         },
+
+
         async loadAuthSession() {
           this.auth.session = oauth.loadSession();
           if (!this.auth.session) return
@@ -1559,7 +1595,8 @@
             this.rawReplies.push(current);
             const { post, replies } = current;
             const replyCount = post?.replyCount;
-            let gatheredReplies = replies
+            let gatheredReplies = replies;
+            //is this a bug or intentional to facillitate threading 
             if (!replies?.length && replyCount > 0) {
               const res = (await this.getPostThread(post.uri))
               gatheredReplies = res?.thread?.replies
@@ -1567,7 +1604,7 @@
             const authorReply = gatheredReplies?.find(reply => reply.post.author.did == post.author.did)
             current = authorReply;
           }
-          console.log(this.rawReplies)
+          // console.log(this.rawReplies)
         },
         async loadQuotes(uri) {
           // this.activeReply = uri;
@@ -1598,6 +1635,31 @@
           }
           console.log("loading author profile", authorProfile);
           this.showAuthor = authorProfile;
+        },
+        async loadAuthorFeed(handle, append = false) {
+
+          this.loadingReplies = true;
+          try {
+            if (!append) {
+              this.rawReplies = []
+              this.replies = [];
+            }
+            const res = await this.getAuthorFeed(handle, 50, this.showAuthor.cursor);
+            console.log("author feed", res)
+            if (!res?.feed) {
+              throw new Error("no posts")
+            }
+            this.rawReplies.push(...res.feed);
+            //set the author cursor to null if it hasn't updated
+            this.showAuthor.cursor = this.showAuthor.cursor != res.cursor ? res.cursor : null
+            await this.loadMoreReplies();
+          } catch (e) {
+            console.error(e);
+            this.replies = [];
+          } finally {
+            this.loadingReplies = false;
+          }
+
         },
         async loadAuthorThread(uri) {
           this.activeReply = uri;
@@ -1662,6 +1724,10 @@
           if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
             if (!this.loadingMoreReplies && this.replies.length < this.rawReplies.length) {
               await this.loadMoreReplies();
+            } else if (!this.loadingMoreReplies && this.replies.length == this.rawReplies.length) {
+              if (this.showAuthor?.cursor) {
+                this.loadAuthorFeed(this.showAuthor.handle, true)
+              }
             }
           }
         },
@@ -1756,7 +1822,7 @@
           try {
             const feed = this.feeds[feedIndex];
             const res = await this.getFeedList(feed, feedIndex, 5, feed.cursor);
-            console.log({ res, feed })
+            // console.log({ res, feed })
             feed.cursor = res.cursor;
             feed.posts.push(...res.posts)
           } finally {
@@ -2123,12 +2189,40 @@
             this.startWebsocket();
           });
         },
-        async transformPost(post, postorder, authorSave = {}, verifiersSave = []) {
+        async transformPost(post, postorder, authorSave = {}, verifiersSave = [], reason = null) {
           const { author, record, hasAuthorThread, likeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}
           const [_, __, repo, collection, rkey] = uri.split("/");
           const { handle, avatar, displayName } = author || {};
           const { embed, langs, reply } = record;
-          const { like, bookmarked } = viewer || {}
+          const { like, bookmarked } = viewer || {};
+          /**
+           * {
+    "by": {
+        "did": "did:plc:vszw3ess46odfhnzdsy4huae",
+        "handle": "segyges.bsky.social",
+        "displayName": "SE Gyges",
+        "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:vszw3ess46odfhnzdsy4huae/bafkreiempgjkhvjq2dobqkmd5pqd6lcbkhgejasfwh3zoygncjpwgqc7te",
+        "associated": {
+            "chat": {
+                "allowIncoming": "all"
+            },
+            "activitySubscription": {
+                "allowSubscriptions": "followers"
+            }
+        },
+        "labels": [],
+        "createdAt": "2023-08-13T21:30:56.810Z"
+    },
+    "uri": "at://did:plc:vszw3ess46odfhnzdsy4huae/app.bsky.feed.repost/3mvvmf3o7d32y",
+    "cid": "bafyreictw36qzkaszgcnceclsfczotflwmoxqrkjltf6kxbrotugzuiqya",
+    "indexedAt": "2026-09-19T21:20:29.564Z",
+    "$type": "app.bsky.feed.defs#reasonRepost"
+}
+           **/
+          const { $type } = reason || {};
+          const repostInfo = $type == "app.bsky.feed.defs#reasonRepost" ? {
+            ...reason.by
+          } : null
 
           let newTweet = {
             cid,
@@ -2154,7 +2248,8 @@
             hasAuthorThread,
             author: authorSave,
             verifiers: verifiersSave,
-            viewerLike: like
+            viewerLike: like,
+            repostInfo
           };
           const { parent, root } = reply || {};
           if (parent?.uri) {
@@ -2171,8 +2266,8 @@
         },
         async transformReplyRecordToPost(replyRecord, postorder) {
           // // console.log({ replyRecord });
-          const { $type, post, replies, threadContext } = replyRecord || {}
-          const newTweet = await this.transformPost(post, postorder);
+          const { $type, post, replies, threadContext, reason } = replyRecord || {}
+          const newTweet = await this.transformPost(post, postorder, post.author, post.verifiers, reason);
           if (replies?.length) {
             newTweet.hasAuthorThread = replies?.some(reply => reply.post.author.did == post.author.did)
           }
@@ -2180,7 +2275,11 @@
         },
         async loadParent(newTweet, parentUri) {
           const parent = (await this.getPosts(parentUri))?.posts[0];
-          newTweet.parent = await this.transformPost(parent, 0, parent.author, parent.verifiers)
+          if (!parent) {
+            newTweet.parentMissingMessage = "couldn't get the parent"
+          } else {
+            newTweet.parent = await this.transformPost(parent, 0, parent.author, parent.verifiers)
+          }
           return newTweet;
         },
         async loadEmbedDetails(newTweet, embed, repo) {
@@ -2333,8 +2432,11 @@
           );
           return posts;
         },
-        async getAuthorFeed(actor, limit = 10) {
-          const queryParams = new URLSearchParams({ actor, limit }).toString();
+        async getAuthorFeed(actor, limit = 10, cursor = null) {
+          const params = { actor }
+          if (limit) params.limit = limit;
+          if (cursor) params.cursor = cursor;
+          const queryParams = new URLSearchParams(params).toString();
           const posts = await this.apiRequest(
             "app.bsky.feed.getAuthorFeed",
             queryParams,

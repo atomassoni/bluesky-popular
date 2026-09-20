@@ -532,7 +532,7 @@
                 <!-- Left section (avatar, displayName, handle) -->
                 <div class="flex min-w-0 flex-1 items-center">
                   <!-- Avatar -->
-                  <button type="button" @click="loadAuthorProfile(tweet.author?.did)"
+                  <button type="button" @click="loadAuthorProfile(tweet.author)"
                     class="mr-4 flex-shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                     :aria-label="`Show profile for ${tweet.displayName || tweet.handle}`">
                     <img :src="tweet.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Avatar"
@@ -808,7 +808,7 @@
                 <div>
                   <div class="flex justify-between items-start mb-1.5">
                     <div class="flex min-w-0 flex-1 items-center">
-                      <div type="button" @click="loadAuthorProfile(tweet.author?.did)" class="mr-4 flex-shrink-0">
+                      <div type="button" @click="loadAuthorProfile(tweet.author)" class="mr-4 flex-shrink-0">
                         <img :src="tweet.avatar" alt="Avatar" class="w-6 h-6 rounded-full" />
                       </div>
 
@@ -975,7 +975,7 @@
 
               <template x-if="tweet.uri !== activeReply">
                 <div class="mt-1 flex items-start px-2 py-1.5">
-                  <div type="button" @click="loadAuthorProfile(tweet.author.did)" class="mr-3">
+                  <div type="button" @click="loadAuthorProfile(tweet.author)" class="mr-3">
                     <img :src="tweet.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect width=%2250%22 height=%2250%22 rx=%2225%22 fill=%22%2310a37f%22/%3E%3Cpath d=%22M25 10a7 7 0 0 1 6.2 3.7 7 7 0 0 1 7.3 11.4 7 7 0 0 1-6.2 11.2A7 7 0 0 1 19 36.3a7 7 0 0 1-7.3-11.4 7 7 0 0 1 6.2-11.2A7 7 0 0 1 25 10Z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.7%22/%3E%3Cpath d=%22m18 14 14 8v16M12 25l14 8 12-7M19 36V20l13-7M12 25l13-7 13 8M19 36l13-8%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E'" alt="Avatar"
                       class="w-6 h-6 rounded-full" />
                   </div>
@@ -1644,13 +1644,17 @@
             this.loadingReplies = false;
           }
         },
-        async loadAuthorProfile(did) {
-          let authorProfile = await db.authors.get({ did })
+        async loadAuthorProfile(author) {
+                    if(!author?.did) return;
+
+          this.showModalReplies = null;
+           this.showAuthor = author;
+
+          let authorProfile = await db.authors.get({ did: author.did })
           if (!authorProfile || (this.auth.session && !authorProfile?.viewer)) {
             authorProfile = await this.getProfile(did);
           }
-          // console.log("loading author profile", authorProfile);
-          this.showModalReplies = null;
+          console.log("loading author profile", authorProfile);
           this.showAuthor = authorProfile;
 
         },

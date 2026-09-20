@@ -229,7 +229,7 @@
     </div>
 
     <div x-cloak x-show="feeds.length" class="flex gap-2 overflow-x-auto px-4 pb-4">
-      <button @click="loadVisibleTweets(menu.sortField); selectedFeed = -1; saveSelectedFeed();" type="button"
+      <button @click="resetTweets(); selectedFeed = -1; saveSelectedFeed();" type="button"
         class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
         :class="selectedFeed === -1 ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'">
         Popular
@@ -270,18 +270,12 @@
       </div>
       <!-- Tweets List -->
       <div>
-        <template x-for="(tweet, index) in searchedTweets" :key="tweet.cid">
-          <!-- start of tweet div -->
-          <div class="post" :data-uri="tweet.uri || tweet.link" style="overflow-wrap: break-word;">
-            <!-- tweet main -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
-              <!-- Profile Card Component -->
-              <div class="w-full max-w-2xl mx-auto">
-                <!-- Profile -->
-                <div x-show="!!showAuthor" x-cloak @keydown.escape.window="showAuthor = null"
-                  class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-                  role="dialog" aria-modal="true" aria-label="Author profile">
-                  <article @click.outside="if (!showModalReplies) showAuthor = null"
+        <!-- Author profile modal -->
+        <div class="w-full max-w-2xl mx-auto">
+          <div x-show="!!showAuthor" x-cloak @keydown.escape.window="showAuthor = null"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            role="dialog" aria-modal="true" aria-label="Author profile">
+            <article @click.outside="if (!showModalReplies) showAuthor = null"
                     class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6 rounded-2xl border border-gray-200 bg-white shadow-2xl dark:bg-neutral-900 dark:border-neutral-800">
                     <button type="button" @click="showAuthor = null"
                       class="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-2xl leading-none text-gray-600 shadow hover:bg-white hover:text-gray-900 dark:bg-neutral-800/90 dark:text-gray-300 dark:hover:bg-neutral-700 dark:hover:text-white"
@@ -324,14 +318,16 @@
 
                             <div
                               class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-                              <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
+                              <a :href="`https://bsky.app/profile/${showAuthor?.handle || showAuthor?.did || ''}`"
+                                target="_blank" rel="noopener noreferrer"
                                 class="hover:underline" x-text="'@' + (showAuthor?.handle || 'unknown')"></a>
                               <span class="hidden sm:inline">•</span>
                               <span class="truncate" :title="showAuthor?.did" x-text="showAuthor?.did"></span>
                             </div>
                           </div>
 
-                          <a :href="tweet.profileUrl" target="_blank" rel="noopener noreferrer"
+                          <a :href="`https://bsky.app/profile/${showAuthor?.handle || showAuthor?.did || ''}`"
+                            target="_blank" rel="noopener noreferrer"
                             class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
                             See on Bsky
                           </a>
@@ -341,11 +337,12 @@
                           </div>
                         </div>
                       </div>
+                    </div>
 
 
-                      <!-- Bio -->
-                      <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
-                        x-text="showAuthor?.description || ''"></div>
+                    <!-- Bio -->
+                    <div class="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-line"
+                      x-text="showAuthor?.description || ''"></div>
 
                       <!-- Quick facts -->
                       <dl class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -385,11 +382,14 @@
                                 x-text="showAuthor?.verification?.verifiedStatus || 'none'"></span></li>
                             <li><span class="font-medium">Trusted Verifier:</span> <span
                                 x-text="showAuthor?.verification?.trustedVerifierStatus || 'no'"></span></li>
-                            <template x-if="(showAuthor?.verification?.verifications || []).length">
+                            <template
+                              x-if="(showAuthor?.verification?.verifications || showAuthor?.verifications || []).length">
                               <li class="mt-1">
                                 <span class="font-medium">Verifiers:</span>
                                 <ul class="mt-1 list-disc list-inside space-y-0.5">
-                                  <template x-for="v in tweet.verifiers" :key="v.did">
+                                  <template
+                                    x-for="v in (showAuthor?.verification?.verifications || showAuthor?.verifications || [])"
+                                    :key="v.did">
                                     <li>
                                       <span x-text="v.handle || 'unknown'"></span>
                                     </li>
@@ -486,9 +486,14 @@
                           </span>
                         </template>
                       </div>
-                  </article>
-                </div>
-              </div>
+            </article>
+          </div>
+        </div>
+        <template x-for="(tweet, index) in searchedTweets" :key="tweet.cid">
+          <!-- start of tweet div -->
+          <div class="post" :data-uri="tweet.uri || tweet.link" style="overflow-wrap: break-word;">
+            <!-- tweet main -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
               <template x-if="tweet.parentMissingMessage">
                 <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-300 dark:border-gray-700 mb-1.5">
                   <div class="mt-1">
@@ -771,7 +776,7 @@
         <!-- Header -->
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">
-            Posts Loaded
+            Posts
             <span x-text="`${replies.length} / ${rawReplies.length}${showAuthor?.cursor?'+':''}`"></span>
           </h2>
           <button class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -1392,8 +1397,8 @@
         loadFeeds() {
           const feedsString = localStorage.getItem("feeds");
           const selectedFeed = localStorage.getItem("selectedFeed");
-          const feedPrefs = localStorage.getItem("feedPrefs");
-
+          const feedPrefsString = localStorage.getItem("feedPrefs");
+          const feedPrefs = JSON.parse(feedPrefsString)
           if (!feedPrefs) return
           this.feeds = JSON.parse(feedsString)
           this.selectedFeed = Number(selectedFeed)
@@ -1410,7 +1415,9 @@
           const feedsString = JSON.stringify(feedPrefs)
           localStorage.setItem("feedPrefs", feedsString)
         },
-        async loadFeedInfo(feeds) {
+        async loadFeedInfo(prefs) {
+          const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2");
+          console.log("load feeds info", feeds)
           const feedResults = await Promise.allSettled(
             feeds.items.map((item, index) => this.getFeedList(item, index, 25))
           )
@@ -1438,7 +1445,7 @@
             const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2");
             // console.log({ feeds });
             this.saveFeedPrefs(prefs)
-            await this.loadFeedInfo(feeds)
+            await this.loadFeedInfo(prefs)
           } catch (error) {
             // this.auth.session = null;
             this.auth.error = error.message || "Unable to restore your Bluesky login.";
@@ -1642,8 +1649,10 @@
           if (!authorProfile || (this.auth.session && !authorProfile?.viewer)) {
             authorProfile = await this.getProfile(did);
           }
-          console.log("loading author profile", authorProfile);
+          // console.log("loading author profile", authorProfile);
+          this.showModalReplies = null;
           this.showAuthor = authorProfile;
+
         },
         async loadAuthorFeed(handle, append = false) {
 
@@ -2500,7 +2509,6 @@
           const posts = await this.apiRequest(
             "app.bsky.graph.getList",
             queryParams,
-            true
           );
           return posts;
         },
@@ -2509,7 +2517,6 @@
           const posts = await this.apiRequest(
             "app.bsky.feed.getFeedGenerator",
             queryParams,
-            true
           );
           return posts;
         }

@@ -13,7 +13,7 @@
     import { Dexie } from 'https://unpkg.com/dexie/dist/modern/dexie.mjs';
     const db = new Dexie('BlueskyDatabase');
     db.version(1).stores({
-      authors: '++id, did, refreshTime',
+      authors: '++id, handle, refreshTime',
       verifiers: '++id, did, refreshTime',
       posts: "++id, cid, refreshTime",
       videos: "++id, cid, refreshTime",
@@ -21,7 +21,7 @@
       trackedLikes: "link",
     });
     db.version(2).stores({
-      authors: '++id, did, refreshTime',
+      authors: '++id, handle, refreshTime',
       verifiers: '++id, did, refreshTime',
       posts: "++id, cid, refreshTime",
       videos: "++id, cid, refreshTime",
@@ -36,6 +36,15 @@
         uri: post.uri,
         viewedAt: post.refreshTime || Date.now(),
       })))
+    });
+    db.version(3).stores({
+      authors: '++id, did, refreshTime',
+      verifiers: '++id, did, refreshTime',
+      posts: "++id, cid, refreshTime",
+      videos: "++id, cid, refreshTime",
+      images: "++id, cid, refreshTime",
+      trackedLikes: "link",
+      seenPosts: "&uri, viewedAt",
     });
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']

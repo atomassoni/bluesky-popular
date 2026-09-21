@@ -1218,9 +1218,8 @@
       </form>
     </div>
   </div>
-
   <div x-cloak x-show="activeImageAlt" x-transition.opacity @keydown.escape.window="activeImageAlt = ''"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
     <div @click="activeImageAlt = ''" class="absolute inset-0"></div>
     <div
       class="relative z-10 flex max-h-[80vh] w-full max-w-md flex-col rounded-xl bg-white p-5 text-gray-900 shadow-xl dark:bg-gray-800 dark:text-gray-100">
@@ -1550,7 +1549,7 @@
             entries.forEach(async (entry) => {
               if (entry.isIntersecting) {
                 const uri = entry.target.dataset.uri
-                if (!uri) return
+                if (!uri) return;
                 await db.seenPosts.put({ uri, viewedAt: Date.now() })
               }
             })
@@ -1953,7 +1952,7 @@
         },
         async getPostExpanded(cid, uri) {
           const [_, __, repo, collection, rkey] = uri.split("/");
-          const seenPost = await db.seenPosts.get(uri)
+          const seenPost = await db.seenPosts.get(uri);
           if (seenPost) {
             console.log("already seen this", seenPost);
             return;

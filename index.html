@@ -1959,7 +1959,7 @@
           }
           let postSave = await db.posts.get({ cid })
           if (!postSave) {
-            postSave = (await this.getPosts(uri))?.posts[0];
+            postSave = (await this.getPosts(uri, false))?.posts[0];
             // console.log({ postSave })
             db.posts.add({ ...postSave, refreshTime: Date.now() })
           } else {
@@ -2438,9 +2438,10 @@
           const res = await this.apiRequest("app.bsky.feed.getLikes", queryParams);
           return res;
         },
-        async getPosts(uris) {
+        async getPosts(uris, forcePublic = true) {
           const queryParams = new URLSearchParams({ uris }).toString();
-          const res = await this.apiRequest("app.bsky.feed.getPosts", queryParams);
+          //have to rewrite single posts in order to not hit authorized get rate limits (ironically) force public for now
+          const res = await this.apiRequest("app.bsky.feed.getPosts", queryParams, forcePublic);
           return res;
         },
         //todo add authenticated getActorLikes?

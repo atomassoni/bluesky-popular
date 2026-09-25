@@ -491,7 +491,8 @@
         </div>
         <template x-for="(tweet, index) in searchedTweets" :key="tweet.cid">
           <!-- start of tweet div -->
-          <div class="post" :data-uri="tweet.uri || tweet.link" style="overflow-wrap: break-word;">
+          <div class="post" :data-uri="tweet.uri || tweet.link"
+            x-init="observePost($el, tweet.uri || tweet.link)" style="overflow-wrap: break-word;">
             <!-- tweet main -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
               <template x-if="tweet.parentMissingMessage">
@@ -1258,6 +1259,9 @@
     `)}`;
 
     function tweetFeed() {
+      const postUris = new WeakMap();
+      const recordedPostUris = new WeakMap();
+
       return {
         fallbackAvatar,
         tweets: [],
@@ -1543,21 +1547,40 @@
           })
           elements.forEach(el => observer.observe(el))
         },
+        observePost(element, uri) {
+          if (!element || !uri) return;
+          postUris.set(element, uri);
+          this.postIntersectionObserver([element]);
+        },
         postIntersectionObserver(elements) {
-          elements.forEach(el => this.observer?.unobserve(el))
-          this.observer = new IntersectionObserver((entries, _observer) => {
-            entries.forEach(async (entry) => {
-              if (entry.isIntersecting) {
-                const uri = entry.target.dataset.uri
+          if (!this.observer) {
+            this.observer = new IntersectionObserver((entries, observer) => {
+              entries.forEach(async (entry) => {
+                if (!entry.isIntersecting) return;
+
+                const uri = postUris.get(entry.target);
                 if (!uri) return;
-                await db.seenPosts.put({ uri, viewedAt: Date.now() })
-              }
-            })
-          }, {
-            threshold: 0.3,
-          })
-          // console.log({ elements })
-          elements.forEach(el => this.observer.observe(el))
+
+                try {
+                  await db.seenPosts.put({ uri, viewedAt: Date.now() });
+                  recordedPostUris.set(entry.target, uri);
+                  postUris.delete(entry.target);
+                  observer.unobserve(entry.target);
+                } catch (error) {
+                  console.error("Unable to mark post as seen", { uri, error });
+                }
+              });
+            }, {
+              threshold: 0.3,
+            });
+          }
+
+          elements.forEach(element => {
+            const uri = postUris.get(element) || element?.dataset.uri;
+            if (!uri || recordedPostUris.get(element) === uri) return;
+            postUris.set(element, uri);
+            this.observer.observe(element);
+          });
         },
         async loadTrackedVideo(target, uri, label) {
           const { video, videoLink, videoLoading } = target

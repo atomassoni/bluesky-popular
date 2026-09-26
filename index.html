@@ -89,10 +89,49 @@
       }));
     });
     try {
+      await db.transaction('rw', db.seenPosts, db.posts, db.images, db.videos, async () => {
+        const seenUris = new Set(await db.seenPosts.toCollection().primaryKeys());
+        if (!seenUris.size) return;
+
+        const seenPostRecords = (await db.posts.toArray()).filter(post => seenUris.has(post.uri));
+        if (!seenPostRecords.length) return;
+
+        const imageCids = new Set();
+        const videoCids = new Set();
+        const collectMediaCids = embed => {
+          if (!embed) return;
+          if (embed.$type?.includes('recordWithMedia')) collectMediaCids(embed.media);
+          if (embed.$type?.includes('video')) {
+            const cid = embed.video?.ref?.$link;
+            if (cid) videoCids.add(cid);
+          }
+          if (embed.$type?.includes('images') || embed.$type?.includes('gallery')) {
+            for (const image of embed.images || embed.items || []) {
+              const cid = image.image?.ref?.$link;
+              if (cid) imageCids.add(cid);
+            }
+          }
+          if (embed.$type?.includes('external')) {
+            const cid = embed.external?.thumb?.ref?.$link;
+            if (cid) imageCids.add(cid);
+          }
+        };
+
+        seenPostRecords.forEach(post => collectMediaCids(post.record?.embed));
+        const [imageIds, videoIds] = await Promise.all([
+          imageCids.size ? db.images.where('cid').anyOf([...imageCids]).primaryKeys() : [],
+          videoCids.size ? db.videos.where('cid').anyOf([...videoCids]).primaryKeys() : [],
+        ]);
+        await Promise.all([
+          db.posts.bulkDelete(seenPostRecords.map(post => post.id)),
+          db.images.bulkDelete(imageIds),
+          db.videos.bulkDelete(videoIds),
+        ]);
+      });
       const deletionTables = ['authors', 'posts', 'videos', 'images']
-      const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
+      const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 2).toArray()))
       // console.log({ oldData })
-      await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))))
+      await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))));
       await db.trackedLikes.clear()
     } catch (err) {
       console.error(err)
@@ -2049,6 +2088,7 @@
             await db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
             this.scheduleStorageStateRefresh();
           } else {
+            await db[databaseName].update(dbRes.id, { refreshTime: Date.now() })
             // console.log("media blob exists", cid)
           }
           return mediaBlob

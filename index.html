@@ -364,9 +364,9 @@
         <label for="feed-search" class="sr-only">Search tweets</label>
         <input id="feed-search" type="search" x-model.debounce.200ms="searchQuery" placeholder="Search tweets..."
           class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-sky-900" />
-        <button type="button" @click="loadMoreList()" :disabled="loadingFeedList"
+        <button type="button" @click="loadMoreList()" :disabled="loadingFeedList || tweets.length >= maxTweets"
           class="shrink-0 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
-          x-text="loadingFeedList ? 'Loading...' : 'Load more'"></button>
+          x-text="loadingFeedList ? 'Loading...' : tweets.length >= maxTweets ? 'Limit reached' : 'Load more'"></button>
       </div>
       <!-- Tweets List -->
       <div>
@@ -1486,6 +1486,17 @@
     Seen posts
   </button>
 
+  <section x-cloak x-show="tweets?.length >= maxTweets"
+    class="mx-4 mb-6 rounded-xl border border-amber-300 bg-amber-50 p-5 text-center text-amber-950 shadow-sm dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+    aria-live="polite">
+    <h2 class="text-lg font-semibold">You’ve reached 100 posts</h2>
+    <p class="mt-1 text-sm">You might be doom scrolling.</p>
+    <button type="button" @click="window.location.reload()"
+      class="mt-4 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400">
+      Refresh page to continue
+    </button>
+  </section>
+
   <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
     loading...
   </p>
@@ -1571,6 +1582,7 @@
         },
         websocket: null,
         observer: null,
+        seenPostsRecordedThisPage: new Set(),
         likeTracker: {},
         dots: [],
         labelTracker: {},
@@ -1584,6 +1596,7 @@
         latestTimeUs: 0,
         numSeconds: 60,
         numToTrack: 25,
+        maxTweets: 100,
         calculating: false,
         collections: {},
         postThreshold: 10,
@@ -1611,7 +1624,7 @@
         selectedFeed: -1,
         searchQuery: "",
         get searchedTweets() {
-          const tweets = this.tweets || [];
+          const tweets = (this.tweets || []).slice(0, this.maxTweets);
           const query = this.searchQuery.trim().toLowerCase();
           if (this.selectedFeed < 0 || !query) return tweets;
 
@@ -1859,19 +1872,40 @@
         postIntersectionObserver(elements) {
           elements.forEach(el => this.observer?.unobserve(el))
           this.observer = new IntersectionObserver((entries, _observer) => {
-            entries.forEach(async (entry) => {
+            entries.forEach((entry) => {
               if (entry.isIntersecting) {
                 const uri = entry.target.dataset.uri
                 if (!uri) return;
-                // console.log("saw this post",this.likeTracker[uri])
-                await this.recordSeenPost(uri)
+                this.recordSeenPostOnce(uri)
               }
             })
           }, {
             threshold: 0.15,
           })
-          // console.log({ elements })
           elements.forEach(el => this.observer.observe(el))
+          this.markVisiblePostsSeen(elements)
+        },
+        markVisiblePostsSeen(elements = document.querySelectorAll('.post')) {
+          elements.forEach(element => {
+            const uri = element.dataset.uri;
+            if (!uri) return;
+            const rect = element.getBoundingClientRect();
+            if (rect.height <= 0) return;
+            const visibleHeight = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+            const requiredHeight = Math.min(rect.height * 0.15, 120);
+            const horizontallyVisible = rect.right > 0 && rect.left < window.innerWidth;
+            if (horizontallyVisible && visibleHeight >= requiredHeight) {
+              this.recordSeenPostOnce(uri);
+            }
+          });
+        },
+        recordSeenPostOnce(uri) {
+          if (!uri || this.seenPostsRecordedThisPage.has(uri)) return;
+          this.seenPostsRecordedThisPage.add(uri);
+          this.recordSeenPost(uri).catch(error => {
+            this.seenPostsRecordedThisPage.delete(uri);
+            console.error("Unable to add post to seenPosts", { uri, error });
+          });
         },
         async recordSeenPost(uri) {
           const tweet = this.likeTracker[uri]
@@ -2113,7 +2147,7 @@
           return replies?.some(reply => reply.post.author.did == post.author.did)
         },
         async loadVisibleTweets(sortField) {
-          const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
+          const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, Math.min(this.numToTrack, this.maxTweets));
           const allHasAuthorThread = await Promise.allSettled(newTweets.map(tweet => this.doesPostHaveAuthorThread(tweet.uri)))
           // console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
@@ -2147,6 +2181,8 @@
           const confirmed = window.confirm(`Clear all ${this.seenPosts.length} seen-post records? This cannot be undone.`);
           if (!confirmed) return;
           await db.seenPosts.clear()
+          this.seenPostsRecordedThisPage.clear();
+          this.$nextTick(() => this.markVisiblePostsSeen());
         },
         startSeenPostsSubscription() {
           this.seenPostsSubscription?.unsubscribe();
@@ -2256,10 +2292,12 @@
           this.menu.sortField = this.menu.selectedSort == 'popularity' ? 'likesPerSecond' : 'postorder';
         },
         async checkScroll() {
+          this.markVisiblePostsSeen();
           const scrollPosition = window.innerHeight + window.scrollY;
           const bottomPosition = document.documentElement.offsetHeight;
 
           if (scrollPosition >= bottomPosition - 100) {
+            if (this.tweets.length >= this.maxTweets) return;
             this.loader = true
             if (this.selectedFeed < 0) {
               if (this.tweets.length >= this.numToTrack) {
@@ -2274,20 +2312,23 @@
         },
         async loadMore() {
           // console.log("load", this.numToTrack);
-          this.numToTrack += 5;
+          if (this.numToTrack >= this.maxTweets) return;
+          this.numToTrack = Math.min(this.numToTrack + 5, this.maxTweets);
           await this.loadVisibleTweets(this.menu.sortField);
         },
         async loadMoreList() {
           if (this.loadingFeedList || this.selectedFeed < 0) return;
 
           const feedIndex = this.selectedFeed;
+          const feed = this.feeds[feedIndex];
+          const remaining = this.maxTweets - feed.posts.length;
+          if (remaining <= 0) return;
           this.loadingFeedList = true;
           try {
-            const feed = this.feeds[feedIndex];
-            const res = await this.getFeedList(feed, feedIndex, 5, feed.cursor);
+            const res = await this.getFeedList(feed, feedIndex, Math.min(5, remaining), feed.cursor);
             // console.log({ res, feed })
             feed.cursor = res.cursor;
-            feed.posts.push(...res.posts)
+            feed.posts.push(...res.posts.slice(0, remaining))
           } finally {
             this.loadingFeedList = false;
           }

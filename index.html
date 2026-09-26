@@ -1379,16 +1379,16 @@
           if (item.type == 'feed') {
             const [{ feed, cursor }, { view }] = await Promise.all([this.getFeed(item.value, limit, oldCursor),
             this.getFeedInfo(item.value)])
-            console.log({ feed, view })
+            // console.log({ feed, view })
             const posts = await Promise.all(feed.map(({ post }) => this.transformPost(post, index, post.author, post.verifiers)))
-            console.log({ ...item, posts, view, cursor })
+            // console.log({ ...item, posts, view, cursor })
             return { ...item, posts, feedInfo: view, cursor }
           }
           if (item.type == 'list') {
             const [{ feed, cursor }, { list }] = await Promise.all([this.getListFeed(item.value, limit, oldCursor),
             this.getListInfo(item.value)])
             const posts = await Promise.all(feed.map(({ post }) => this.transformPost(post, index, post.author, post.verifiers)))
-            console.log({ ...item, posts, list, cursor })
+            // console.log({ ...item, posts, list, cursor })
             return { ...item, posts, feedInfo: list, cursor }
           }
           return null
@@ -1416,7 +1416,7 @@
         },
         async loadFeedInfo(prefs) {
           const feeds = prefs?.preferences?.find(def => def.$type == "app.bsky.actor.defs#savedFeedsPrefV2");
-          console.log("load feeds info", feeds)
+          // console.log("load feeds info", feeds)
           const feedResults = await Promise.allSettled(
             feeds.items.map((item, index) => this.getFeedList(item, index, 25))
           )
@@ -1550,7 +1550,7 @@
               if (entry.isIntersecting) {
                 const uri = entry.target.dataset.uri
                 if (!uri) return;
-                console.log("saw this post",this.likeTracker[uri])
+                // console.log("saw this post",this.likeTracker[uri])
                 await db.seenPosts.put({ uri, viewedAt: Date.now() })
               }
             })
@@ -1654,7 +1654,7 @@
           if (!authorProfile || (this.auth.session && !authorProfile?.viewer)) {
             authorProfile = await this.getProfile(did);
           }
-          console.log("loading author profile", authorProfile);
+          // console.log("loading author profile", authorProfile);
           this.showAuthor = authorProfile;
 
         },
@@ -1667,7 +1667,7 @@
               this.replies = [];
             }
             const res = await this.getAuthorFeed(handle, 50, this.showAuthor?.cursor);
-            console.log("author feed", res)
+            // console.log("author feed", res)
             if (!res?.feed) {
               throw new Error("no posts")
             }
@@ -1776,7 +1776,7 @@
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, this.numToTrack);
           const allHasAuthorThread = await Promise.allSettled(newTweets.map(tweet => this.doesPostHaveAuthorThread(tweet.uri)))
-          console.log({ newTweets })
+          // console.log({ newTweets })
           for (let index = 0; index < newTweets.length; index++) {
             const { link: uri, quotePost } = newTweets[index];
             await this.loadVideoInLikeTracker(uri);
@@ -1955,7 +1955,7 @@
           const [_, __, repo, collection, rkey] = uri.split("/");
           const seenPost = await db.seenPosts.get(uri);
           if (seenPost) {
-            console.log("already seen this", seenPost);
+            // console.log("already seen this", seenPost);
             return;
           }
           let postSave = await db.posts.get({ cid })

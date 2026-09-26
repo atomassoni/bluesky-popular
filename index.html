@@ -155,7 +155,7 @@
     }
 
     @media (min-width: 1024px) {
-      body {
+      body.seen-posts-explorer-visible {
         padding-right: 48vw;
       }
     }
@@ -165,7 +165,7 @@
 
 <body class="bg-white dark:bg-gray-900 min-h-screen flex items-start justify-center">
   <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())"
-    x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt || !!showAuthor)"
+    x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt || !!showAuthor); document.body.classList.toggle('seen-posts-explorer-visible', menu.showSeenPostsExplorer !== false)"
     id="scroll-container" class="min-h-screen w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
     @scroll.window.debounce.300ms="checkScroll">
     <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
@@ -228,6 +228,18 @@
                 :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showChart }">
                 Show likes graph
                 <svg x-show="menu.showChart" xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </p>
+            </li>
+            <li>
+              <p @click="menu.showSeenPostsExplorer = menu.showSeenPostsExplorer === false; open = false"
+                class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                :class="{ 'bg-gray-100 dark:bg-gray-700': menu.showSeenPostsExplorer !== false }">
+                Show seen posts explorer
+                <svg x-show="menu.showSeenPostsExplorer !== false" xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24"
                   stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -1333,7 +1345,7 @@
     </div>
   </div>
 
-  <aside x-cloak x-show="showSeenPostsPanel"
+  <aside x-cloak x-show="menu.showSeenPostsExplorer !== false && showSeenPostsPanel"
     class="fixed inset-3 z-[45] flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 lg:inset-y-4 lg:left-auto lg:right-4 lg:w-[46vw]"
     aria-label="Seen posts database">
     <div class="border-b border-gray-200 p-4 dark:border-gray-700">
@@ -1469,7 +1481,7 @@
     </div>
   </aside>
 
-  <button x-cloak x-show="!showSeenPostsPanel" type="button" @click="showSeenPostsPanel = true"
+  <button x-cloak x-show="menu.showSeenPostsExplorer !== false && !showSeenPostsPanel" type="button" @click="showSeenPostsPanel = true"
     class="fixed bottom-4 right-4 z-40 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-sky-500 lg:hidden">
     Seen posts
   </button>
@@ -1619,7 +1631,8 @@
           showLabeled: false,
           noBigAccounts: false,
           autoPlayVideo: false,
-          showDots: false
+          showDots: false,
+          showSeenPostsExplorer: true
         },
         async init() {
           if (oauth.redirectLocalhost()) return;
@@ -2189,7 +2202,8 @@
           return `${amount.toFixed(unitIndex === 0 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2)} ${units[unitIndex]}`;
         },
         isUnseenPost(uri) {
-          return this.seenPostsLoaded
+          return this.menu.showSeenPostsExplorer !== false
+            && this.seenPostsLoaded
             && Boolean(uri)
             && !this.seenPosts.some(post => post.uri === uri);
         },

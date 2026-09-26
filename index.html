@@ -13,80 +13,13 @@
     import { Dexie, liveQuery } from 'https://unpkg.com/dexie/dist/modern/dexie.mjs';
     const db = new Dexie('BlueskyDatabase');
     db.version(1).stores({
-      authors: '++id, handle, refreshTime',
-      verifiers: '++id, did, refreshTime',
-      posts: "++id, cid, refreshTime",
-      videos: "++id, cid, refreshTime",
-      images: "++id, cid, refreshTime",
-      trackedLikes: "link",
-    });
-    db.version(2).stores({
-      authors: '++id, handle, refreshTime',
-      verifiers: '++id, did, refreshTime',
-      posts: "++id, cid, refreshTime",
-      videos: "++id, cid, refreshTime",
-      images: "++id, cid, refreshTime",
-      trackedLikes: "link",
-      seenPosts: "&uri, viewedAt",
-    }).upgrade(async transaction => {
-      const viewedPosts = await transaction.table('posts')
-        .filter(post => post.viewCount > 0 && Boolean(post.uri))
-        .toArray()
-      await transaction.table('seenPosts').bulkPut(viewedPosts.map(post => ({
-        uri: post.uri,
-        viewedAt: post.refreshTime || Date.now(),
-      })))
-    });
-    db.version(3).stores({
-      authors: '++id, did, refreshTime',
-      verifiers: '++id, did, refreshTime',
-      posts: "++id, cid, refreshTime",
-      videos: "++id, cid, refreshTime",
-      images: "++id, cid, refreshTime",
-      trackedLikes: "link",
-      seenPosts: "&uri, viewedAt",
-    });
-    db.version(4).stores({
-      authors: '++id, did, refreshTime',
-      verifiers: '++id, did, refreshTime',
-      posts: "++id, cid, refreshTime",
-      videos: "++id, cid, refreshTime",
-      images: "++id, cid, refreshTime",
-      trackedLikes: "link",
-      seenPosts: "&uri, viewedAt, createdAt, poster, mediaType",
-    }).upgrade(async transaction => {
-      const [seenPosts, cachedPosts] = await Promise.all([
-        transaction.table('seenPosts').toArray(),
-        transaction.table('posts').toArray(),
-      ]);
-      const postsByUri = new Map(cachedPosts.filter(post => post.uri).map(post => [post.uri, post]));
-
-      const describeEmbed = embed => {
-        if (!embed) return {};
-        if (embed.$type?.includes('recordWithMedia')) return describeEmbed(embed.media);
-        if (embed.$type?.includes('video')) return { mediaType: 'video', altText: embed.alt || '' };
-        if (embed.$type?.includes('images') || embed.$type?.includes('gallery')) {
-          const images = embed.images || embed.items || [];
-          return {
-            mediaType: 'image',
-            altText: images.map(image => image.alt).filter(Boolean).join(' | '),
-          };
-        }
-        return {};
-      };
-
-      await transaction.table('seenPosts').bulkPut(seenPosts.map(seenPost => {
-        const post = postsByUri.get(seenPost.uri);
-        if (!post) return seenPost;
-        return {
-          ...seenPost,
-          poster: post.author?.handle || '',
-          displayName: post.author?.displayName || '',
-          text: post.record?.text || '',
-          createdAt: post.record?.createdAt || '',
-          ...describeEmbed(post.record?.embed),
-        };
-      }));
+      authors: 'did, refreshTime',
+      verifiers: 'did, refreshTime',
+      posts: 'uri, cid, refreshTime',
+      videos: 'cid, refreshTime',
+      images: 'cid, refreshTime',
+      trackedLikes: 'link',
+      seenPosts: 'uri, viewedAt, createdAt, poster, mediaType',
     });
     try {
       await db.transaction('rw', db.seenPosts, db.posts, db.images, db.videos, async () => {
@@ -123,16 +56,26 @@
           videoCids.size ? db.videos.where('cid').anyOf([...videoCids]).primaryKeys() : [],
         ]);
         await Promise.all([
-          db.posts.bulkDelete(seenPostRecords.map(post => post.id)),
+          db.posts.bulkDelete(seenPostRecords.map(post => post.uri)),
           db.images.bulkDelete(imageIds),
           db.videos.bulkDelete(videoIds),
         ]);
       });
       const deletionTables = ['authors', 'posts', 'videos', 'images']
-      const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 2).toArray()))
-      // console.log({ oldData })
-      await Promise.all(deletionTables.map((tableName, index) => db[tableName].bulkDelete(oldData[index].map(a => a.id))));
-      await db.trackedLikes.clear()
+      await db.transaction('rw', [...deletionTables.map(tableName => db[tableName]), db.trackedLikes, db.seenPosts], async () => {
+        const oldKeys = await Promise.all(deletionTables.map(tableName =>
+          db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 2).primaryKeys()
+        ));
+        const expiredSeenPostUris = await db.seenPosts
+          .where('viewedAt')
+          .below(Date.now() - 1000 * 60 * 60 * 48)
+          .primaryKeys();
+        await Promise.all(deletionTables.map((tableName, index) =>
+          db[tableName].bulkDelete(oldKeys[index])
+        ));
+        await db.seenPosts.bulkDelete(expiredSeenPostUris);
+        await db.trackedLikes.clear();
+      });
     } catch (err) {
       console.error(err)
     }
@@ -1410,6 +1353,13 @@
             </span>
           </template>
         </div>
+        <div x-show="storageState.persistent === false" class="mt-2 flex items-center gap-2">
+          <button type="button" @click="requestPersistentStorage()" :disabled="storageStateLoading"
+            class="rounded-md border border-sky-300 bg-sky-50 px-2.5 py-1 font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950">
+            Protect storage
+          </button>
+          <span class="text-gray-500 dark:text-gray-400">Ask the browser not to evict this origin's data.</span>
+        </div>
         <p x-show="storageState.error" class="mt-2 text-red-600 dark:text-red-400" x-text="storageState.error"></p>
         <p x-show="storageState.updatedAt" class="mt-2 text-gray-400"
           x-text="`Updated ${formatSeenDate(storageState.updatedAt)}`"></p>
@@ -2021,9 +1971,9 @@
           this.showModalReplies = null;
           this.showAuthor = author;
 
-          let authorProfile = await db.authors.get({ did: author.did })
+          let authorProfile = await db.authors.get(author.did)
           if (!authorProfile || (this.auth.session && !authorProfile?.viewer)) {
-            authorProfile = await this.getProfile(did);
+            authorProfile = await this.getProfile(author.did);
           }
           // console.log("loading author profile", authorProfile);
           this.showAuthor = authorProfile;
@@ -2127,15 +2077,15 @@
         },
         async loadBlob(databaseName, cid, repo) {
 
-          let dbRes = await db[databaseName].get({ cid })
+          let dbRes = await db[databaseName].get(cid)
           let mediaBlob = dbRes?.blob
           if (!mediaBlob) {
             mediaBlob = await this.getMediaBlob(cid, repo);
             // console.log("media downloading")
-            await db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
+            await db[databaseName].put({ cid, blob: mediaBlob, refreshTime: Date.now() })
             this.scheduleStorageStateRefresh();
           } else {
-            await db[databaseName].update(dbRes.id, { refreshTime: Date.now() })
+            await db[databaseName].update(cid, { refreshTime: Date.now() })
             // console.log("media blob exists", cid)
           }
           return mediaBlob
@@ -2224,6 +2174,36 @@
               updatedAt: Date.now(),
               error: error.message || "Unable to read storage state.",
             };
+          } finally {
+            this.storageStateLoading = false;
+          }
+        },
+        async requestPersistentStorage() {
+          if (!navigator.storage?.persist) {
+            this.storageState.error = "This browser does not support persistent-storage requests.";
+            return;
+          }
+          this.storageStateLoading = true;
+          try {
+            const persistent = await navigator.storage.persist();
+            const [estimate, tableCounts] = await Promise.all([
+              navigator.storage.estimate?.() || Promise.resolve({}),
+              Promise.all(db.tables.map(async table => [table.name, await table.count()])),
+            ]);
+            this.storageState = {
+              origin: window.location.origin,
+              usage: estimate.usage ?? null,
+              quota: estimate.quota ?? null,
+              persistent,
+              counts: Object.fromEntries(tableCounts),
+              updatedAt: Date.now(),
+              error: persistent
+                ? ""
+                : "The browser did not grant persistent storage. Its site-data settings may offer another way to protect this origin.",
+            };
+          } catch (error) {
+            console.error("Unable to request persistent browser storage", error);
+            this.storageState.error = error.message || "Unable to request persistent storage.";
           } finally {
             this.storageStateLoading = false;
           }
@@ -2439,11 +2419,11 @@
             // console.log("already seen this", seenPost);
             return;
           }
-          let postSave = await db.posts.get({ cid })
+          let postSave = await db.posts.get(uri)
           if (!postSave) {
             postSave = (await this.getPosts(uri, false))?.posts[0];
             // console.log({ postSave })
-            db.posts.add({ ...postSave, refreshTime: Date.now() })
+            if (postSave) await db.posts.put({ ...postSave, refreshTime: Date.now() })
           } else {
             console.log("post exists", postSave)
           }
@@ -2464,12 +2444,12 @@
             if (!showPost) return
           }
           const { handle, avatar, displayName, did } = author || {};
-          let authorSave = await db.authors.get({ did })
+          let authorSave = await db.authors.get(did)
           //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
           if (!authorSave) { //refresh time over 24 hours ago
             const authorProfile = await this.getProfile(repo);
             // console.log({ authorProfile })
-            db.authors.add({ ...authorProfile, refreshTime: Date.now() })
+            await db.authors.put({ ...authorProfile, refreshTime: Date.now() })
             authorSave = { ...authorProfile, refreshTime: Date.now() }
           }
           const ratio = authorSave.followersCount / likeCount
@@ -2479,12 +2459,12 @@
           let verifiersSave = []
           for (const verification of authorSave.verification?.verifications || []) {
             const { issuer } = verification
-            const verifier = await db.verifiers.get({ did: issuer });
+            const verifier = await db.verifiers.get(issuer);
             if (verifier) {
               verifiersSave.push(verifier);
             } else {
               const newVerifier = await this.getProfile(issuer);
-              db.verifiers.add({ ...newVerifier, refreshTime: Date.now() })
+              await db.verifiers.put({ ...newVerifier, refreshTime: Date.now() })
               verifiersSave.push(newVerifier);
             }
           }
@@ -2825,13 +2805,13 @@
           const recordCid = embed.record?.cid || embed.record?.record?.cid;
 
           if (recordUri) {
-            let quotePostSave = await db.posts.get({ cid: recordCid })
+            let quotePostSave = await db.posts.get(recordUri)
 
             if (!quotePostSave) {
               quotePostSave = (await this.getPosts(recordUri))?.posts[0];
               // console.log("saved quoted post", quotePostSave, recordCid, quotePostSave?.cid)
               if (quotePostSave) {
-                db.posts.add({ ...quotePostSave, refreshTime: Date.now() })
+                await db.posts.put({ ...quotePostSave, refreshTime: Date.now() })
               }
             }
             if (quotePostSave?.uri && !this.likeTracker[quotePostSave.uri])

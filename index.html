@@ -1325,6 +1325,44 @@
           placeholder="Search URI, poster, text, or alt text…"
           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-sky-900" />
       </label>
+      <section class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/70"
+        aria-label="Browser storage state">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h3 class="font-semibold text-gray-800 dark:text-gray-200">Storage state</h3>
+            <p class="truncate text-gray-500 dark:text-gray-400" :title="storageState.origin" x-text="storageState.origin || location.origin"></p>
+          </div>
+          <button type="button" @click="refreshStorageState()" :disabled="storageStateLoading"
+            class="shrink-0 rounded-md border border-gray-300 bg-white px-2.5 py-1 font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700"
+            x-text="storageStateLoading ? 'Checking…' : 'Refresh'"></button>
+        </div>
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div class="rounded-md bg-white p-2 dark:bg-gray-900">
+            <span class="block text-gray-500 dark:text-gray-400">Usage</span>
+            <strong class="mt-0.5 block text-gray-800 dark:text-gray-200"
+              x-text="`${formatBytes(storageState.usage)} / ${formatBytes(storageState.quota)}`"></strong>
+          </div>
+          <div class="rounded-md bg-white p-2 dark:bg-gray-900">
+            <span class="block text-gray-500 dark:text-gray-400">Quota used</span>
+            <strong class="mt-0.5 block text-gray-800 dark:text-gray-200" x-text="storagePercentUsed"></strong>
+          </div>
+          <div class="rounded-md bg-white p-2 dark:bg-gray-900">
+            <span class="block text-gray-500 dark:text-gray-400">Retention</span>
+            <strong class="mt-0.5 block text-gray-800 dark:text-gray-200"
+              x-text="storageState.persistent === true ? 'Persistent' : storageState.persistent === false ? 'Best effort' : 'Unknown'"></strong>
+          </div>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <template x-for="(count, tableName) in storageState.counts" :key="tableName">
+            <span class="rounded-full border border-gray-200 bg-white px-2 py-1 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+              <span x-text="tableName"></span>: <strong x-text="count"></strong>
+            </span>
+          </template>
+        </div>
+        <p x-show="storageState.error" class="mt-2 text-red-600 dark:text-red-400" x-text="storageState.error"></p>
+        <p x-show="storageState.updatedAt" class="mt-2 text-gray-400"
+          x-text="`Updated ${formatSeenDate(storageState.updatedAt)}`"></p>
+      </section>
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
@@ -1429,6 +1467,22 @@
         seenPostsSort: "viewedAt",
         seenPostsSortDirection: "desc",
         seenPostsSubscription: null,
+        storageStateTimer: null,
+        storageStateLoading: false,
+        storageState: {
+          origin: "",
+          usage: null,
+          quota: null,
+          persistent: null,
+          counts: {},
+          updatedAt: null,
+          error: "",
+        },
+        get storagePercentUsed() {
+          if (!this.storageState.quota && this.storageState.quota !== 0) return "—";
+          if (this.storageState.quota === 0) return "0%";
+          return `${((this.storageState.usage || 0) / this.storageState.quota * 100).toFixed(2)}%`;
+        },
         seenPostsColumns: [
           { key: "poster", label: "Poster", className: "w-40" },
           { key: "text", label: "Post", className: "w-72" },
@@ -1551,6 +1605,7 @@
         },
         destroy() {
           this.seenPostsSubscription?.unsubscribe();
+          clearTimeout(this.storageStateTimer);
         },
         async loadPostUri(postUri) {
           this.selectedFeed = -1;
@@ -1991,7 +2046,8 @@
           if (!mediaBlob) {
             mediaBlob = await this.getMediaBlob(cid, repo);
             // console.log("media downloading")
-            db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
+            await db[databaseName].add({ cid, blob: mediaBlob, refreshTime: Date.now() })
+            this.scheduleStorageStateRefresh();
           } else {
             // console.log("media blob exists", cid)
           }
@@ -2045,9 +2101,52 @@
             next: posts => {
               this.seenPosts = posts;
               this.seenPostsLoaded = true;
+              this.scheduleStorageStateRefresh();
             },
             error: error => console.error("Unable to watch seen posts", error),
           });
+        },
+        scheduleStorageStateRefresh() {
+          clearTimeout(this.storageStateTimer);
+          this.storageStateTimer = setTimeout(() => this.refreshStorageState(), 300);
+        },
+        async refreshStorageState() {
+          if (this.storageStateLoading) return;
+          this.storageStateLoading = true;
+          try {
+            const [estimate, persistent, tableCounts] = await Promise.all([
+              navigator.storage?.estimate?.() || Promise.resolve({}),
+              navigator.storage?.persisted?.() || Promise.resolve(null),
+              Promise.all(db.tables.map(async table => [table.name, await table.count()])),
+            ]);
+            this.storageState = {
+              origin: window.location.origin,
+              usage: estimate.usage ?? null,
+              quota: estimate.quota ?? null,
+              persistent,
+              counts: Object.fromEntries(tableCounts),
+              updatedAt: Date.now(),
+              error: "",
+            };
+          } catch (error) {
+            console.error("Unable to read browser storage state", error);
+            this.storageState = {
+              ...this.storageState,
+              updatedAt: Date.now(),
+              error: error.message || "Unable to read storage state.",
+            };
+          } finally {
+            this.storageStateLoading = false;
+          }
+        },
+        formatBytes(value) {
+          if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
+          const bytes = Number(value);
+          if (bytes === 0) return "0 B";
+          const units = ["B", "KB", "MB", "GB", "TB"];
+          const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+          const amount = bytes / Math.pow(1024, unitIndex);
+          return `${amount.toFixed(unitIndex === 0 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2)} ${units[unitIndex]}`;
         },
         isUnseenPost(uri) {
           return this.seenPostsLoaded

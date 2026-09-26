@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script type="module">
     // Import Dexie
-    import { Dexie } from 'https://unpkg.com/dexie/dist/modern/dexie.mjs';
+    import { Dexie, liveQuery } from 'https://unpkg.com/dexie/dist/modern/dexie.mjs';
     const db = new Dexie('BlueskyDatabase');
     db.version(1).stores({
       authors: '++id, handle, refreshTime',
@@ -46,6 +46,48 @@
       trackedLikes: "link",
       seenPosts: "&uri, viewedAt",
     });
+    db.version(4).stores({
+      authors: '++id, did, refreshTime',
+      verifiers: '++id, did, refreshTime',
+      posts: "++id, cid, refreshTime",
+      videos: "++id, cid, refreshTime",
+      images: "++id, cid, refreshTime",
+      trackedLikes: "link",
+      seenPosts: "&uri, viewedAt, createdAt, poster, mediaType",
+    }).upgrade(async transaction => {
+      const [seenPosts, cachedPosts] = await Promise.all([
+        transaction.table('seenPosts').toArray(),
+        transaction.table('posts').toArray(),
+      ]);
+      const postsByUri = new Map(cachedPosts.filter(post => post.uri).map(post => [post.uri, post]));
+
+      const describeEmbed = embed => {
+        if (!embed) return {};
+        if (embed.$type?.includes('recordWithMedia')) return describeEmbed(embed.media);
+        if (embed.$type?.includes('video')) return { mediaType: 'video', altText: embed.alt || '' };
+        if (embed.$type?.includes('images') || embed.$type?.includes('gallery')) {
+          const images = embed.images || embed.items || [];
+          return {
+            mediaType: 'image',
+            altText: images.map(image => image.alt).filter(Boolean).join(' | '),
+          };
+        }
+        return {};
+      };
+
+      await transaction.table('seenPosts').bulkPut(seenPosts.map(seenPost => {
+        const post = postsByUri.get(seenPost.uri);
+        if (!post) return seenPost;
+        return {
+          ...seenPost,
+          poster: post.author?.handle || '',
+          displayName: post.author?.displayName || '',
+          text: post.record?.text || '',
+          createdAt: post.record?.createdAt || '',
+          ...describeEmbed(post.record?.embed),
+        };
+      }));
+    });
     try {
       const deletionTables = ['authors', 'posts', 'videos', 'images']
       const oldData = await Promise.all(deletionTables.map(tableName => db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 24).toArray()))
@@ -56,6 +98,7 @@
       console.error(err)
     }
     window.db = db
+    window.liveQuery = liveQuery
 
     import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs/+esm';
     window.Alpine = Alpine;
@@ -71,15 +114,21 @@
     [x-cloak] {
       display: none !important;
     }
+
+    @media (min-width: 1024px) {
+      body {
+        padding-right: 48vw;
+      }
+    }
   </style>
   <!-- <script type="module" src="./dist/bundle.js"></script> -->
 </head>
 
-<body class="bg-white dark:bg-gray-900 min-h-screen flex items-center justify-center">
+<body class="bg-white dark:bg-gray-900 min-h-screen flex items-start justify-center">
   <div x-data="tweetFeed" x-init="$watch('open', value => saveMenu())"
     x-effect="document.body.classList.toggle('overflow-hidden', showModalReplies || showLoginModal || !!activeImageAlt || !!showAuthor)"
-    id="scroll-container" class="w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
-    @scroll.window.debounce.300ms="checkScroll" class="min-h-screen">
+    id="scroll-container" class="min-h-screen w-full max-w-2xl bg-white dark:bg-gray-900 dark:text-gray-200"
+    @scroll.window.debounce.300ms="checkScroll">
     <div x-on:click.away="resetTweets" x-show="menu.showChart" id="chart"></div>
 
     <!-- Heading -->
@@ -491,7 +540,13 @@
         </div>
         <template x-for="(tweet, index) in searchedTweets" :key="tweet.cid">
           <!-- start of tweet div -->
-          <div class="post" :data-uri="tweet.uri || tweet.link" style="overflow-wrap: break-word;">
+          <div class="post relative rounded-xl transition duration-300" :data-uri="tweet.uri || tweet.link"
+            :class="isUnseenPost(tweet.uri || tweet.link) ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-white dark:ring-amber-500 dark:ring-offset-gray-900' : ''"
+            style="overflow-wrap: break-word;">
+            <span x-show="isUnseenPost(tweet.uri || tweet.link)" x-cloak
+              class="absolute right-3 top-3 z-20 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-950 shadow-sm dark:bg-amber-500">
+              Unseen
+            </span>
             <!-- tweet main -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
               <template x-if="tweet.parentMissingMessage">
@@ -1237,6 +1292,100 @@
     </div>
   </div>
 
+  <aside x-cloak x-show="showSeenPostsPanel"
+    class="fixed inset-3 z-[45] flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 lg:inset-y-4 lg:left-auto lg:right-4 lg:w-[46vw]"
+    aria-label="Seen posts database">
+    <div class="border-b border-gray-200 p-4 dark:border-gray-700">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Seen posts</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <span x-text="filteredSeenPosts.length"></span>
+            <span x-text="filteredSeenPosts.length === 1 ? 'record' : 'records'"></span>
+            <span x-show="seenPostsSearch"> matching</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" @click="resetPostCache()" :disabled="!seenPosts.length"
+            class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40">
+            Clear all
+          </button>
+          <button type="button" @click="showSeenPostsPanel = false"
+            class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 lg:hidden">
+            Close
+          </button>
+        </div>
+      </div>
+      <label class="mt-3 block">
+        <span class="sr-only">Search seen posts</span>
+        <input type="search" x-model.debounce.150ms="seenPostsSearch"
+          placeholder="Search URI, poster, text, or alt text…"
+          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-sky-900" />
+      </label>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-auto">
+      <table class="w-full min-w-[900px] table-fixed border-collapse text-left text-xs">
+        <thead class="sticky top-0 z-10 bg-gray-50 text-gray-600 shadow-sm dark:bg-gray-800 dark:text-gray-300">
+          <tr>
+            <template x-for="column in seenPostsColumns" :key="column.key">
+              <th scope="col" class="border-b border-gray-200 px-3 py-2 font-semibold dark:border-gray-700"
+                :class="column.className">
+                <button type="button" @click="sortSeenPosts(column.key)" class="flex w-full items-center gap-1 hover:text-sky-600 dark:hover:text-sky-400">
+                  <span x-text="column.label"></span>
+                  <span x-show="seenPostsSort === column.key" x-text="seenPostsSortDirection === 'asc' ? '↑' : '↓'" aria-hidden="true"></span>
+                </button>
+              </th>
+            </template>
+            <th scope="col" class="w-10 border-b border-gray-200 px-2 py-2 dark:border-gray-700">
+              <span class="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+          <template x-for="post in filteredSeenPosts" :key="post.uri">
+            <tr class="align-top text-gray-700 hover:bg-sky-50/60 dark:text-gray-300 dark:hover:bg-sky-950/20"
+              :class="post.uri === latestSeenPostUri ? 'bg-amber-100/80 ring-1 ring-inset ring-amber-300 dark:bg-amber-950/30 dark:ring-amber-700' : ''"
+              :aria-current="post.uri === latestSeenPostUri ? 'true' : null">
+              <td class="px-3 py-3">
+                <a x-show="post.poster" :href="`https://bsky.app/profile/${post.poster}`" target="_blank" rel="noopener noreferrer"
+                  class="block truncate font-medium hover:underline" :title="post.displayName || post.poster"
+                  x-text="post.poster ? `@${post.poster}` : '—'"></a>
+                <span x-show="!post.poster" class="text-gray-400">—</span>
+              </td>
+              <td class="px-3 py-3">
+                <div class="line-clamp-4 whitespace-pre-wrap break-words" :title="seenPostSummary(post)" x-text="seenPostSummary(post)"></div>
+                <span x-show="post.mediaType" class="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-700 dark:text-gray-300" x-text="post.mediaType"></span>
+              </td>
+              <td class="px-3 py-3 text-gray-500 dark:text-gray-400" :title="formatSeenDate(post.createdAt)" x-text="formatSeenDate(post.createdAt)"></td>
+              <td class="px-3 py-3 text-gray-500 dark:text-gray-400" :title="formatSeenDate(post.viewedAt)" x-text="formatSeenDate(post.viewedAt)"></td>
+              <td class="px-3 py-3">
+                <span x-show="post.uri === latestSeenPostUri"
+                  class="mb-1 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900 dark:text-amber-200">Latest</span>
+                <a :href="seenPostUrl(post)" target="_blank" rel="noopener noreferrer"
+                  class="block truncate font-mono text-[11px] text-sky-700 hover:underline dark:text-sky-400"
+                  :title="post.uri" x-text="shortSeenUri(post.uri)"></a>
+              </td>
+              <td class="px-2 py-3">
+                <button type="button" @click="deleteSeenPost(post.uri)"
+                  class="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                  :aria-label="`Remove ${post.uri} from seen posts`" title="Remove record">&times;</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <div x-show="!filteredSeenPosts.length" class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        <span x-text="seenPostsSearch ? 'No seen posts match your search.' : 'Posts will appear here as they are viewed.'"></span>
+      </div>
+    </div>
+  </aside>
+
+  <button x-cloak x-show="!showSeenPostsPanel" type="button" @click="showSeenPostsPanel = true"
+    class="fixed bottom-4 right-4 z-40 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-sky-500 lg:hidden">
+    Seen posts
+  </button>
+
   <p x-cloak x-show="loader" class="text-gray-800 dark:text-gray-200 justify-center animate-pulse">
     loading...
   </p>
@@ -1262,6 +1411,48 @@
         fallbackAvatar,
         tweets: [],
         allPosts: [],
+        seenPosts: [],
+        seenPostsLoaded: false,
+        showSeenPostsPanel: true,
+        seenPostsSearch: "",
+        seenPostsSort: "viewedAt",
+        seenPostsSortDirection: "desc",
+        seenPostsSubscription: null,
+        seenPostsColumns: [
+          { key: "poster", label: "Poster", className: "w-40" },
+          { key: "text", label: "Post", className: "w-72" },
+          { key: "createdAt", label: "Posted", className: "w-40" },
+          { key: "viewedAt", label: "Viewed", className: "w-40" },
+          { key: "uri", label: "URI", className: "w-52" },
+        ],
+        get latestSeenPostUri() {
+          return this.seenPosts.reduce((latest, post) => {
+            const viewedAt = new Date(post.viewedAt || 0).getTime();
+            const latestViewedAt = new Date(latest?.viewedAt || 0).getTime();
+            return viewedAt > latestViewedAt ? post : latest;
+          }, null)?.uri || "";
+        },
+        get filteredSeenPosts() {
+          const query = this.seenPostsSearch.trim().toLowerCase();
+          const filtered = query
+            ? this.seenPosts.filter(post => [
+              post.uri,
+              post.poster,
+              post.displayName,
+              post.text,
+              post.mediaType,
+              post.altText,
+            ].some(value => String(value || "").toLowerCase().includes(query)))
+            : [...this.seenPosts];
+          const direction = this.seenPostsSortDirection === "asc" ? 1 : -1;
+          const field = this.seenPostsSort;
+          return filtered.sort((left, right) => {
+            if (field === "createdAt" || field === "viewedAt") {
+              return ((new Date(left[field] || 0).getTime()) - (new Date(right[field] || 0).getTime())) * direction;
+            }
+            return String(left[field] || "").localeCompare(String(right[field] || "")) * direction;
+          });
+        },
         websocket: null,
         observer: null,
         likeTracker: {},
@@ -1328,6 +1519,7 @@
         },
         async init() {
           if (oauth.redirectLocalhost()) return;
+          this.startSeenPostsSubscription();
           window.addEventListener("bluesky-auth-expired", (event) => {
             this.auth.session = null;
             this.openLoginModal();
@@ -1345,6 +1537,9 @@
           this.startWebsocket();
           this.chartIt()
 
+        },
+        destroy() {
+          this.seenPostsSubscription?.unsubscribe();
         },
         async loadPostUri(postUri) {
           this.selectedFeed = -1;
@@ -1551,14 +1746,38 @@
                 const uri = entry.target.dataset.uri
                 if (!uri) return;
                 // console.log("saw this post",this.likeTracker[uri])
-                await db.seenPosts.put({ uri, viewedAt: Date.now() })
+                await this.recordSeenPost(uri)
               }
             })
           }, {
-            threshold: 0.3,
+            threshold: 0.15,
           })
           // console.log({ elements })
           elements.forEach(el => this.observer.observe(el))
+        },
+        async recordSeenPost(uri) {
+          const tweet = this.likeTracker[uri]
+            || this.allPosts.find(post => post.uri === uri || post.link === uri)
+            || this.tweets.find(post => post.uri === uri || post.link === uri);
+          const existing = await db.seenPosts.get(uri);
+          const imageAlt = tweet?.images?.map(image => image.alt).filter(Boolean).join(" | ") || "";
+          const mediaType = tweet?.mediaType || (tweet?.videoLink || tweet?.video
+            ? "video"
+            : tweet?.images?.length
+              ? "image"
+              : "");
+
+          await db.seenPosts.put({
+            ...existing,
+            uri,
+            poster: tweet?.handle || existing?.poster || "",
+            displayName: tweet?.displayName || existing?.displayName || "",
+            text: tweet?.content || existing?.text || "",
+            mediaType: mediaType || existing?.mediaType || "",
+            altText: tweet?.mediaAlt || imageAlt || existing?.altText || "",
+            createdAt: tweet?.createdAt || existing?.createdAt || "",
+            viewedAt: Date.now(),
+          });
         },
         async loadTrackedVideo(target, uri, label) {
           const { video, videoLink, videoLoading } = target
@@ -1806,6 +2025,61 @@
         },
         async resetPostCache() {
           await db.seenPosts.clear()
+        },
+        startSeenPostsSubscription() {
+          this.seenPostsSubscription?.unsubscribe();
+          this.seenPostsSubscription = window.liveQuery(() => db.seenPosts.toArray()).subscribe({
+            next: posts => {
+              this.seenPosts = posts;
+              this.seenPostsLoaded = true;
+            },
+            error: error => console.error("Unable to watch seen posts", error),
+          });
+        },
+        isUnseenPost(uri) {
+          return this.seenPostsLoaded
+            && Boolean(uri)
+            && !this.seenPosts.some(post => post.uri === uri);
+        },
+        sortSeenPosts(field) {
+          if (this.seenPostsSort === field) {
+            this.seenPostsSortDirection = this.seenPostsSortDirection === "asc" ? "desc" : "asc";
+            return;
+          }
+          this.seenPostsSort = field;
+          this.seenPostsSortDirection = field === "createdAt" || field === "viewedAt" ? "desc" : "asc";
+        },
+        async deleteSeenPost(uri) {
+          await db.seenPosts.delete(uri);
+        },
+        seenPostSummary(post) {
+          if (post.text) return post.text;
+          if (post.mediaType) {
+            const label = post.mediaType === "image" ? "Image" : "Video";
+            return post.altText ? `${label}: ${post.altText}` : label;
+          }
+          return "Details unavailable (older record)";
+        },
+        shortSeenUri(uri) {
+          return String(uri || "");
+        },
+        seenPostUrl(post) {
+          const parts = String(post.uri || "").split("/");
+          if (parts.length < 5) return "https://bsky.app";
+          return `https://bsky.app/profile/${post.poster || parts[2]}/post/${parts.at(-1)}`;
+        },
+        formatSeenDate(value) {
+          if (!value) return "—";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return "—";
+          return date.toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+          });
         },
         filterPosts(tweets) {
           return tweets.filter(p => this.menu.selectedFilter == 'new' ? new Date(p.createdAt).valueOf() > Date.now() - 10 * 60 * 1000 : p).filter(p => this.menu.showAllLanguages ? p : p.langs?.includes('en'))
@@ -2314,12 +2588,16 @@
               newTweet = await this.loadRecordEmbed(newTweet, embed);
             }
           } else if (embed.$type?.includes("embed.images") || embed.$type?.includes("embed.gallery")) {
+            newTweet.mediaType = "image";
+            newTweet.mediaAlt = (embed.images || embed.items || []).map(image => image.alt).filter(Boolean).join(" | ");
             newTweet = await this.loadPostImages(newTweet, embed, repo)
           } else if (embed.$type?.includes("embed.external")) {
             newTweet = await this.formatEmbedExternal(newTweet, embed, repo)
           } else if (embed.$type?.includes("embed.video")) {
             // console.log("video", { embed })
+            newTweet.mediaType = "video";
             newTweet.videoLink = embed.video.ref.$link;
+            newTweet.mediaAlt = embed.alt || "";
             newTweet.images = [
               {
                 src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='2' fill='%23fff' fill-opacity='.9'/%3E%3Cpath d='M7.4 3.3 9.3 4.5 7.4 5.7Z' fill='%23111827'/%3E%3C/svg%3E",

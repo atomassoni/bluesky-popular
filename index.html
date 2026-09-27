@@ -2530,8 +2530,9 @@
 
             if (operation != "create") {
               if (operation == "delete") {
-                const { timeUsRecorded, uri } = this.rkeyMap.get(`${data.did}/${rkey}`) || {};
-                this.rkeyMap.delete(rkeyKey);
+                const rkeyMapKey = `${data.did}/${rkey}`;
+                const { timeUsRecorded, uri } = this.rkeyMap.get(rkeyMapKey) || {};
+                this.rkeyMap.delete(rkeyMapKey);
                 if (!uri) return;
 
                 if (this.likeTracker[uri]) {
@@ -2665,7 +2666,7 @@
             if (this.counter % 10000 == 0) {
               // console.log("this.counter", this.counter)
               let newCount = 0
-              const cutoffUs = this.latestTimeUs - 60_000_000;
+              const cutoffUs = this.latestTimeUs - 300_000_000;
 
               for (const [key, value] of this.rkeyMap) {
                 if (value.timeUsRecorded < cutoffUs) {

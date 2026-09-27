@@ -62,19 +62,30 @@
         ]);
       });
       const deletionTables = ['authors', 'posts', 'videos', 'images']
-      await db.transaction('rw', [...deletionTables.map(tableName => db[tableName]), db.trackedLikes, db.seenPosts], async () => {
+      await db.transaction('rw', [...deletionTables.map(tableName => db[tableName]), db.trackedLikes], async () => {
         const oldKeys = await Promise.all(deletionTables.map(tableName =>
           db[tableName].where('refreshTime').below(Date.now() - 1000 * 60 * 60 * 2).primaryKeys()
         ));
-        const expiredSeenPostUris = await db.seenPosts
-          .where('viewedAt')
-          .below(Date.now() - 1000 * 60 * 60 * 48)
-          .primaryKeys();
         await Promise.all(deletionTables.map((tableName, index) =>
           db[tableName].bulkDelete(oldKeys[index])
         ));
-        await db.seenPosts.bulkDelete(expiredSeenPostUris);
         await db.trackedLikes.clear();
+      });
+
+      const seenPostCutoff = Date.now() - 1000 * 60 * 60 * 48;
+      await db.transaction('rw', db.seenPosts, async () => {
+        const expiredSeenPostUris = await db.seenPosts
+          .filter(post => {
+            const viewedAt = Number(post.viewedAt);
+            return Number.isFinite(viewedAt) && viewedAt < seenPostCutoff;
+          })
+          .primaryKeys();
+        if (!expiredSeenPostUris.length) return;
+
+        await db.seenPosts.bulkDelete(expiredSeenPostUris);
+        console.info(`Removed ${expiredSeenPostUris.length} seen posts older than 48 hours.`, {
+          cutoff: new Date(seenPostCutoff).toISOString(),
+        });
       });
     } catch (err) {
       console.error(err)
@@ -1319,12 +1330,14 @@
           placeholder="Search URI, poster, text, or alt text…"
           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:focus:ring-sky-900" />
       </label>
-      <section class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/70"
+      <section
+        class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/70"
         aria-label="Browser storage state">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
             <h3 class="font-semibold text-gray-800 dark:text-gray-200">Storage state</h3>
-            <p class="truncate text-gray-500 dark:text-gray-400" :title="storageState.origin" x-text="storageState.origin || location.origin"></p>
+            <p class="truncate text-gray-500 dark:text-gray-400" :title="storageState.origin"
+              x-text="storageState.origin || location.origin"></p>
           </div>
           <button type="button" @click="refreshStorageState()" :disabled="storageStateLoading"
             class="shrink-0 rounded-md border border-gray-300 bg-white px-2.5 py-1 font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -1348,7 +1361,8 @@
         </div>
         <div class="mt-2 flex flex-wrap gap-1.5">
           <template x-for="(count, tableName) in storageState.counts" :key="tableName">
-            <span class="rounded-full border border-gray-200 bg-white px-2 py-1 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            <span
+              class="rounded-full border border-gray-200 bg-white px-2 py-1 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
               <span x-text="tableName"></span>: <strong x-text="count"></strong>
             </span>
           </template>
@@ -1431,7 +1445,8 @@
     </div>
   </aside>
 
-  <button x-cloak x-show="menu.showSeenPostsExplorer !== false && !showSeenPostsPanel" type="button" @click="showSeenPostsPanel = true"
+  <button x-cloak x-show="menu.showSeenPostsExplorer !== false && !showSeenPostsPanel" type="button"
+    @click="showSeenPostsPanel = true"
     class="fixed bottom-4 right-4 z-40 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-sky-500 lg:hidden">
     Seen posts
   </button>
@@ -2516,6 +2531,7 @@
             if (operation != "create") {
               if (operation == "delete") {
                 const { timeUsRecorded, uri } = this.rkeyMap.get(`${data.did}/${rkey}`) || {};
+                this.rkeyMap.delete(rkeyKey);
                 if (!uri) return;
 
                 if (this.likeTracker[uri]) {
@@ -2649,6 +2665,13 @@
             if (this.counter % 10000 == 0) {
               // console.log("this.counter", this.counter)
               let newCount = 0
+              const cutoffUs = this.latestTimeUs - 60_000_000;
+
+              for (const [key, value] of this.rkeyMap) {
+                if (value.timeUsRecorded < cutoffUs) {
+                  this.rkeyMap.delete(key);
+                }
+              }
               for (const uri in this.likeTracker) {
                 if (this.likeTracker[uri]?.content) {
                   newCount++

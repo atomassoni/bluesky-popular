@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -21,9 +20,58 @@
       trackedLikes: 'link',
       seenPosts: 'uri, viewedAt, createdAt, poster, mediaType',
     });
+
+    let seenPostsDb = db;
+    let seenPostsTable = db.seenPosts;
+    let seenPostsBucket = null;
+
+    if (navigator.storageBuckets?.open) {
+      try {
+        seenPostsBucket = await navigator.storageBuckets.open('bluesky-seen-posts', {
+          durability: 'strict',
+          persisted: true,
+        });
+        const bucketDb = new Dexie('BlueskySeenPosts', {
+          indexedDB: seenPostsBucket.indexedDB,
+          IDBKeyRange: window.IDBKeyRange,
+        });
+        bucketDb.version(1).stores({
+          seenPosts: 'uri, viewedAt, createdAt, poster, mediaType',
+        });
+        await bucketDb.open();
+
+        seenPostsDb = bucketDb;
+        seenPostsTable = bucketDb.seenPosts;
+        if (!await seenPostsBucket.persisted()) {
+          console.warn('The browser did not grant persistent storage for seen posts.');
+        }
+      } catch (error) {
+        seenPostsBucket = null;
+        console.warn('Unable to use a dedicated Storage Bucket for seen posts; using default IndexedDB.', error);
+      }
+    }
+
+    const getSeenPostsPersistence = () => seenPostsBucket
+      ? seenPostsBucket.persisted()
+      : navigator.storage?.persisted?.() || Promise.resolve(null);
+    const getStorageTableCounts = async () => {
+      const counts = await Promise.all(db.tables
+        .filter(table => table.name !== 'seenPosts')
+        .map(async table => [table.name, await table.count()]));
+      counts.push(['seenPosts', await seenPostsTable.count()]);
+      return Object.fromEntries(counts);
+    };
+    window.seenPostsStorage = {
+      bucket: seenPostsBucket,
+      db: seenPostsDb,
+      table: seenPostsTable,
+      getPersistence: getSeenPostsPersistence,
+      getTableCounts: getStorageTableCounts,
+    };
+
     try {
-      await db.transaction('rw', db.seenPosts, db.posts, db.images, db.videos, async () => {
-        const seenUris = new Set(await db.seenPosts.toCollection().primaryKeys());
+      const seenUris = new Set(await seenPostsTable.toCollection().primaryKeys());
+      await db.transaction('rw', db.posts, db.images, db.videos, async () => {
         if (!seenUris.size) return;
 
         const seenPostRecords = (await db.posts.toArray()).filter(post => seenUris.has(post.uri));
@@ -73,8 +121,8 @@
       });
 
       const seenPostCutoff = Date.now() - 1000 * 60 * 60 * 48;
-      await db.transaction('rw', db.seenPosts, async () => {
-        const expiredSeenPostUris = await db.seenPosts
+      await seenPostsDb.transaction('rw', seenPostsTable, async () => {
+        const expiredSeenPostUris = await seenPostsTable
           .filter(post => {
             const viewedAt = Number(post.viewedAt);
             return Number.isFinite(viewedAt) && viewedAt < seenPostCutoff;
@@ -82,7 +130,7 @@
           .primaryKeys();
         if (!expiredSeenPostUris.length) return;
 
-        await db.seenPosts.bulkDelete(expiredSeenPostUris);
+        await seenPostsTable.bulkDelete(expiredSeenPostUris);
         console.info(`Removed ${expiredSeenPostUris.length} seen posts older than 48 hours.`, {
           cutoff: new Date(seenPostCutoff).toISOString(),
         });
@@ -91,6 +139,7 @@
       console.error(err)
     }
     window.db = db
+    window.seenPostsDb = seenPostsDb
     window.liveQuery = liveQuery
 
     import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs/+esm';
@@ -1354,9 +1403,9 @@
             <strong class="mt-0.5 block text-gray-800 dark:text-gray-200" x-text="storagePercentUsed"></strong>
           </div>
           <div class="rounded-md bg-white p-2 dark:bg-gray-900">
-            <span class="block text-gray-500 dark:text-gray-400">Retention</span>
+            <span class="block text-gray-500 dark:text-gray-400">Seen-post retention</span>
             <strong class="mt-0.5 block text-gray-800 dark:text-gray-200"
-              x-text="storageState.persistent === true ? 'Persistent' : storageState.persistent === false ? 'Best effort' : 'Unknown'"></strong>
+              x-text="storageState.seenPostsPersistent === true ? 'Persistent' : storageState.seenPostsPersistent === false ? 'Best effort' : 'Unknown'"></strong>
           </div>
         </div>
         <div class="mt-2 flex flex-wrap gap-1.5">
@@ -1367,12 +1416,12 @@
             </span>
           </template>
         </div>
-        <div x-show="storageState.persistent === false" class="mt-2 flex items-center gap-2">
+        <div x-show="storageState.seenPostsPersistent === false" class="mt-2 flex items-center gap-2">
           <button type="button" @click="requestPersistentStorage()" :disabled="storageStateLoading"
             class="rounded-md border border-sky-300 bg-sky-50 px-2.5 py-1 font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950">
             Protect storage
           </button>
-          <span class="text-gray-500 dark:text-gray-400">Ask the browser not to evict this origin's data.</span>
+          <span class="text-gray-500 dark:text-gray-400">Ask the browser not to evict seen-post history.</span>
         </div>
         <p x-show="storageState.error" class="mt-2 text-red-600 dark:text-red-400" x-text="storageState.error"></p>
         <p x-show="storageState.updatedAt" class="mt-2 text-gray-400"
@@ -1501,6 +1550,7 @@
           usage: null,
           quota: null,
           persistent: null,
+          seenPostsPersistent: null,
           counts: {},
           updatedAt: null,
           error: "",
@@ -1548,7 +1598,6 @@
         websocket: null,
         observer: null,
         seenPostsRecordedThisPage: new Set(),
-        objectUrls: new Set(),
         likeTracker: {},
         dots: [],
         labelTracker: {},
@@ -1637,8 +1686,6 @@
         destroy() {
           this.seenPostsSubscription?.unsubscribe();
           clearTimeout(this.storageStateTimer);
-          for (const url of this.objectUrls) URL.revokeObjectURL(url);
-          this.objectUrls.clear();
         },
         async loadPostUri(postUri) {
           this.selectedFeed = -1;
@@ -1879,7 +1926,7 @@
           const tweet = this.likeTracker[uri]
             || this.allPosts.find(post => post.uri === uri || post.link === uri)
             || this.tweets.find(post => post.uri === uri || post.link === uri);
-          const existing = await db.seenPosts.get(uri);
+          const existing = await window.seenPostsStorage.table.get(uri);
           const imageAlt = tweet?.images?.map(image => image.alt).filter(Boolean).join(" | ") || "";
           const mediaType = tweet?.mediaType || (tweet?.videoLink || tweet?.video
             ? "video"
@@ -1887,7 +1934,7 @@
               ? "image"
               : "");
 
-          await db.seenPosts.put({
+          await window.seenPostsStorage.table.put({
             ...existing,
             uri,
             poster: tweet?.handle || existing?.poster || "",
@@ -1913,7 +1960,7 @@
             }]
 
             const videoBlob = await this.loadBlob('videos', videoLink, repo)
-            target.video = this.createObjectUrl(videoBlob);
+            target.video = URL.createObjectURL(videoBlob);
             target.images = []
             // console.log(`loaded ${label}`, target)
           } catch (err) {
@@ -1929,23 +1976,6 @@
           if (post.quotePost) {
             await this.loadTrackedVideo(post.quotePost, post.quotePost.uri, 'quote video')
           }
-        },
-        createObjectUrl(blob) {
-          const url = URL.createObjectURL(blob);
-          this.objectUrls.add(url);
-          return url;
-        },
-        releaseObjectUrl(url) {
-          if (!url?.startsWith?.("blob:")) return;
-          URL.revokeObjectURL(url);
-          this.objectUrls.delete(url);
-        },
-        releasePostObjectUrls(post) {
-          if (!post) return;
-          this.releaseObjectUrl(post.video);
-          for (const image of post.images || []) this.releaseObjectUrl(image?.src);
-          this.releaseObjectUrl(post.external?.imageSrc);
-          this.releasePostObjectUrls(post.quotePost);
         },
         numRepliesToLoad: 10,
         async getAllParents(reply) {
@@ -2165,13 +2195,13 @@
         async resetPostCache() {
           const confirmed = window.confirm(`Clear all ${this.seenPosts.length} seen-post records? This cannot be undone.`);
           if (!confirmed) return;
-          await db.seenPosts.clear()
+          await window.seenPostsStorage.table.clear()
           this.seenPostsRecordedThisPage.clear();
           this.$nextTick(() => this.markVisiblePostsSeen());
         },
         startSeenPostsSubscription() {
           this.seenPostsSubscription?.unsubscribe();
-          this.seenPostsSubscription = window.liveQuery(() => db.seenPosts.toArray()).subscribe({
+          this.seenPostsSubscription = window.liveQuery(() => window.seenPostsStorage.table.toArray()).subscribe({
             next: posts => {
               this.seenPosts = posts;
               this.seenPostsLoaded = true;
@@ -2188,17 +2218,19 @@
           if (this.storageStateLoading) return;
           this.storageStateLoading = true;
           try {
-            const [estimate, persistent, tableCounts] = await Promise.all([
+            const [estimate, persistent, seenPostsPersistent, counts] = await Promise.all([
               navigator.storage?.estimate?.() || Promise.resolve({}),
               navigator.storage?.persisted?.() || Promise.resolve(null),
-              Promise.all(db.tables.map(async table => [table.name, await table.count()])),
+              window.seenPostsStorage.getPersistence(),
+              window.seenPostsStorage.getTableCounts(),
             ]);
             this.storageState = {
               origin: window.location.origin,
               usage: estimate.usage ?? null,
               quota: estimate.quota ?? null,
               persistent,
-              counts: Object.fromEntries(tableCounts),
+              seenPostsPersistent,
+              counts,
               updatedAt: Date.now(),
               error: "",
             };
@@ -2214,27 +2246,32 @@
           }
         },
         async requestPersistentStorage() {
-          if (!navigator.storage?.persist) {
+          const seenPostsBucket = window.seenPostsStorage.bucket;
+          if (!seenPostsBucket?.persist && !navigator.storage?.persist) {
             this.storageState.error = "This browser does not support persistent-storage requests.";
             return;
           }
           this.storageStateLoading = true;
           try {
-            const persistent = await navigator.storage.persist();
-            const [estimate, tableCounts] = await Promise.all([
+            const seenPostsPersistent = seenPostsBucket
+              ? await seenPostsBucket.persist()
+              : await navigator.storage.persist();
+            const [estimate, persistent, counts] = await Promise.all([
               navigator.storage.estimate?.() || Promise.resolve({}),
-              Promise.all(db.tables.map(async table => [table.name, await table.count()])),
+              navigator.storage.persisted?.() || Promise.resolve(null),
+              window.seenPostsStorage.getTableCounts(),
             ]);
             this.storageState = {
               origin: window.location.origin,
               usage: estimate.usage ?? null,
               quota: estimate.quota ?? null,
               persistent,
-              counts: Object.fromEntries(tableCounts),
+              seenPostsPersistent,
+              counts,
               updatedAt: Date.now(),
-              error: persistent
+              error: seenPostsPersistent
                 ? ""
-                : "The browser did not grant persistent storage. Its site-data settings may offer another way to protect this origin.",
+                : "The browser did not grant persistent storage for seen posts. Its site-data settings may offer another way to protect this origin.",
             };
           } catch (error) {
             console.error("Unable to request persistent browser storage", error);
@@ -2267,7 +2304,7 @@
           this.seenPostsSortDirection = field === "createdAt" || field === "viewedAt" ? "desc" : "asc";
         },
         async deleteSeenPost(uri) {
-          await db.seenPosts.delete(uri);
+          await window.seenPostsStorage.table.delete(uri);
         },
         seenPostSummary(post) {
           if (post.text) return post.text;
@@ -2449,7 +2486,7 @@
         },
         async getPostExpanded(cid, uri) {
           const [_, __, repo, collection, rkey] = uri.split("/");
-          const seenPost = await db.seenPosts.get(uri);
+          const seenPost = await window.seenPostsStorage.table.get(uri);
           if (seenPost) {
             // console.log("already seen this", seenPost);
             return;
@@ -2686,7 +2723,7 @@
             if (this.counter % 10000 == 0) {
               // console.log("this.counter", this.counter)
               let newCount = 0
-              const cutoffUs = this.latestTimeUs - 300_000_000;
+              const cutoffUs = this.latestTimeUs - 30_000_000;
 
               for (const [key, value] of this.rkeyMap) {
                 if (value.timeUsRecorded < cutoffUs) {
@@ -2697,7 +2734,6 @@
                 if (this.likeTracker[uri]?.content) {
                   newCount++
                 } else if (this.likeTracker[uri].likeHistoryLength < 6) {
-                  this.releasePostObjectUrls(this.likeTracker[uri]);
                   delete this.likeTracker[uri]
                 }
               }
@@ -2871,7 +2907,6 @@
         },
         async formatEmbedExternal(newTweet, embed, repo) {
           // console.log("formatting embed external", newTweet, embed, repo)
-          this.releaseObjectUrl(newTweet.external?.imageSrc);
           newTweet.external = {}; // embed;
           const { external } = embed;
           const { title, description, uri } = external;
@@ -2882,7 +2917,7 @@
                 external.thumb.ref.$link,
                 repo
               );
-              newTweet.external.imageSrc = this.createObjectUrl(blob);
+              newTweet.external.imageSrc = URL.createObjectURL(blob);
             } catch (err) {
               console.error(err)
             }
@@ -2900,7 +2935,6 @@
           return newTweet
         },
         async loadPostImages(newTweet, embed, repo) {
-          for (const image of newTweet.images || []) this.releaseObjectUrl(image?.src);
           newTweet.images = [];
           try {
             for (const img of embed.images || embed.items) {
@@ -2910,7 +2944,7 @@
                 img.image.ref.$link,
                 repo
               );
-              newTweet.images.push({ src: this.createObjectUrl(blob), alt: img.alt });
+              newTweet.images.push({ src: URL.createObjectURL(blob), alt: img.alt });
             }
           } catch (err) {
             console.error("load images error", err, newTweet, embed, repo)

@@ -1548,6 +1548,7 @@
         websocket: null,
         observer: null,
         seenPostsRecordedThisPage: new Set(),
+        objectUrls: new Set(),
         likeTracker: {},
         dots: [],
         labelTracker: {},
@@ -1636,6 +1637,8 @@
         destroy() {
           this.seenPostsSubscription?.unsubscribe();
           clearTimeout(this.storageStateTimer);
+          for (const url of this.objectUrls) URL.revokeObjectURL(url);
+          this.objectUrls.clear();
         },
         async loadPostUri(postUri) {
           this.selectedFeed = -1;
@@ -1910,7 +1913,7 @@
             }]
 
             const videoBlob = await this.loadBlob('videos', videoLink, repo)
-            target.video = URL.createObjectURL(videoBlob);
+            target.video = this.createObjectUrl(videoBlob);
             target.images = []
             // console.log(`loaded ${label}`, target)
           } catch (err) {
@@ -1926,6 +1929,23 @@
           if (post.quotePost) {
             await this.loadTrackedVideo(post.quotePost, post.quotePost.uri, 'quote video')
           }
+        },
+        createObjectUrl(blob) {
+          const url = URL.createObjectURL(blob);
+          this.objectUrls.add(url);
+          return url;
+        },
+        releaseObjectUrl(url) {
+          if (!url?.startsWith?.("blob:")) return;
+          URL.revokeObjectURL(url);
+          this.objectUrls.delete(url);
+        },
+        releasePostObjectUrls(post) {
+          if (!post) return;
+          this.releaseObjectUrl(post.video);
+          for (const image of post.images || []) this.releaseObjectUrl(image?.src);
+          this.releaseObjectUrl(post.external?.imageSrc);
+          this.releasePostObjectUrls(post.quotePost);
         },
         numRepliesToLoad: 10,
         async getAllParents(reply) {
@@ -2677,6 +2697,7 @@
                 if (this.likeTracker[uri]?.content) {
                   newCount++
                 } else if (this.likeTracker[uri].likeHistoryLength < 6) {
+                  this.releasePostObjectUrls(this.likeTracker[uri]);
                   delete this.likeTracker[uri]
                 }
               }
@@ -2850,6 +2871,7 @@
         },
         async formatEmbedExternal(newTweet, embed, repo) {
           // console.log("formatting embed external", newTweet, embed, repo)
+          this.releaseObjectUrl(newTweet.external?.imageSrc);
           newTweet.external = {}; // embed;
           const { external } = embed;
           const { title, description, uri } = external;
@@ -2860,7 +2882,7 @@
                 external.thumb.ref.$link,
                 repo
               );
-              newTweet.external.imageSrc = URL.createObjectURL(blob);
+              newTweet.external.imageSrc = this.createObjectUrl(blob);
             } catch (err) {
               console.error(err)
             }
@@ -2878,6 +2900,7 @@
           return newTweet
         },
         async loadPostImages(newTweet, embed, repo) {
+          for (const image of newTweet.images || []) this.releaseObjectUrl(image?.src);
           newTweet.images = [];
           try {
             for (const img of embed.images || embed.items) {
@@ -2887,7 +2910,7 @@
                 img.image.ref.$link,
                 repo
               );
-              newTweet.images.push({ src: URL.createObjectURL(blob), alt: img.alt });
+              newTweet.images.push({ src: this.createObjectUrl(blob), alt: img.alt });
             }
           } catch (err) {
             console.error("load images error", err, newTweet, embed, repo)

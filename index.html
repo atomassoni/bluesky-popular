@@ -1688,8 +1688,10 @@
 
           this.loadAuthSession()
           this.addVisibilityListeners();
-          const postUri = new URLSearchParams(window.location.search).get("postUri");
+          const params = new URLSearchParams(window.location.search);
+          const postUri = params.get("postUri") || params.get("link");
           if (postUri) {
+            console.log("load post", postUri)
             await this.loadPostUri(postUri);
           }
           this.startWebsocket();
@@ -1702,9 +1704,27 @@
         },
         async loadPostUri(postUri) {
           this.selectedFeed = -1;
-          this.showOnlyUri = postUri;
 
           try {
+            if (!postUri.startsWith("at://")) {
+              const link = new URL(postUri);
+              const match = link.pathname.match(/^\/profile\/([^/]+)\/post\/([^/]+)\/?$/);
+              if (link.protocol !== "https:" || link.hostname !== "bsky.app" || !match) {
+                throw new Error("Invalid Bluesky post link");
+              }
+              let actor = decodeURIComponent(match[1]);
+              if (!actor.startsWith("did:")) {
+                const profile = await this.apiRequest(
+                  "app.bsky.actor.getProfile",
+                  new URLSearchParams({ actor }).toString(),
+                  true
+                );
+                if (!profile?.did) throw new Error("Unable to resolve Bluesky handle");
+                actor = profile.did;
+              }
+              postUri = `at://${actor}/app.bsky.feed.post/${match[2]}`;
+            }
+            this.showOnlyUri = postUri;
             const { post, replies } = (await this.getPostThread(postUri, 2))?.thread;
 
             if (!post) {
@@ -2170,9 +2190,13 @@
 
         },
         async doesPostHaveAuthorThread(uri) {
-          const { post, replies } = (await this.getPostThread(uri, 2))?.thread;
-          // // console.log({ post, replies })
-          return replies?.some(reply => reply.post.author.did == post.author.did)
+          try {
+          const { post, replies } = (await this.getPostThread(uri, 2))?.thread || {};
+            return replies?.some(reply => reply.post.author.did == post.author.did)
+          } catch (err) {
+            console.error(err)
+            return 
+          }
         },
         async loadVisibleTweets(sortField) {
           const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, Math.min(this.numToTrack, this.maxTweets));
@@ -2434,7 +2458,8 @@
           });
         },
         resetTweets() {
-          const postUri = new URLSearchParams(window.location.search).get("postUri");
+          const params = new URLSearchParams(window.location.search);
+          const postUri = params.get("postUri") || (params.get("link") && this.showOnlyUri);
           if (postUri) {
             this.showOnlyUri = postUri;
             this.tweets = [this.likeTracker[postUri]].filter(Boolean);

@@ -172,7 +172,7 @@
 
   <script type="module">
     import { formatDistanceToNowStrict } from "https://esm.sh/date-fns/formatDistanceToNowStrict.mjs";
-    window.format = formatDistanceToNowStrict;
+    window.formatDistance = formatDistanceToNowStrict;
   </script>
   <style>
     [x-cloak] {
@@ -694,7 +694,7 @@
                 </div>
 
                 <!-- Right section (timestamp), aligned to top -->
-                <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+                <p class="text-sm text-gray-400" x-text="formatDistance(new Date(tweet.createdAt))"></p>
               </div>
 
               <!-- Tweet Content (Full Width) -->
@@ -961,7 +961,7 @@
                       </div>
                     </div>
 
-                    <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+                    <p class="text-sm text-gray-400" x-text="formatDistance(new Date(tweet.createdAt))"></p>
                   </div>
 
                   <a :href="tweet.postUrl" target="_blank"
@@ -1121,7 +1121,7 @@
                       </span>
                       <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.handle"></span>
                     </p>
-                    <p class="text-sm text-gray-400" x-text="tweet.timestamp"></p>
+                    <p class="text-sm text-gray-400"  x-text="formatDistance(new Date(tweet.createdAt))"></p>
 
                     <a :href="tweet.postUrl" target="_blank"
                       class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
@@ -1510,7 +1510,7 @@
 
   <button x-cloak x-show="menu.showSeenPostsExplorer !== false && !showSeenPostsPanel" type="button"
     @click="showSeenPostsPanel = true"
-    class="fixed bottom-4 right-4 z-40 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-sky-500 lg:hidden">
+    class="fixed bottom-4 right-4 z-40 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-sky-500 ">
     Seen posts
   </button>
 
@@ -1552,7 +1552,7 @@
         allPosts: [],
         seenPosts: [],
         seenPostsLoaded: false,
-        showSeenPostsPanel: true,
+        showSeenPostsPanel: false,
         seenPostsSearch: "",
         seenPostsSort: "viewedAt",
         seenPostsSortDirection: "desc",
@@ -2675,17 +2675,12 @@
                 .map(([link, record]) => ({
                   link,
                   ...record,
-                  timestamp: record.createdAt
-                    ? format(new Date(record.createdAt), {
-                      // addSuffix: true,
-                    })
-                    : null,
+               
                 }));
 
               let tweets = trackedPosts
                 .filter((r) => r.content)
-                .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
-
+                .map(tweet => ({ ...tweet,  likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
               // const dbput = tweets.map(t => ({ likeHistoryLength: t.likeHistoryLength, link: t.link, likesPerSecond: t.likesPerSecond, author: t.handle }))
               // db.trackedLikes.bulkPut(dbput).then(() => {
               //   // console.log("Done adding 100,000 raindrops all over the place");
@@ -2790,9 +2785,7 @@
           let newTweet = {
             cid,
             uri,
-            timestamp: format(new Date(record.createdAt), {
-              // addSuffix: true,
-            }),
+         
             likeCount,
             replyCount,
             quoteCount,

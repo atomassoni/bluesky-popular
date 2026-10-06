@@ -1101,6 +1101,31 @@
                     <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
                     <span>Reposts: <span x-text="tweet.repostCount"></span></span>
                   </p>
+                   <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadReplies(tweet.uri); showModalReplies = true">
+                      View replies
+                    </button>
+                      <button x-show="tweet.quoteCount> 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
+                      View quotes
+                    </button>
+                    <!-- "view thread" button -->
+                    <button x-show="tweet.hasAuthorThread" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadAuthorThread(tweet.uri); showModalReplies = true">
+                      View thread
+                    </button>
                 </div>
               </template>
 
@@ -1267,6 +1292,14 @@
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadReplies(tweet.uri); showModalReplies = true">
                       View replies
+                    </button>
+                      <button x-show="tweet.quoteCount> 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+           bg-gray-100 text-gray-800 border border-gray-300
+           hover:bg-gray-200 hover:border-gray-400
+           dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
+           dark:hover:bg-gray-600 dark:hover:border-gray-500
+           transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
+                      View quotes
                     </button>
                     <!-- "view thread" button -->
                     <button x-show="tweet.hasAuthorThread" class="px-3 py-1.5 mt-1.5 text-sm rounded-md

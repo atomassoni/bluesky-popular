@@ -353,8 +353,8 @@
       </div>
     </div>
 
-    <div x-cloak x-show="feeds.length" class="flex gap-2 overflow-x-auto px-4 pb-4">
-      <button @click="resetTweets(); selectedFeed = -1; saveSelectedFeed();" type="button"
+    <div x-cloak x-show="feeds?.length" class="flex gap-2 overflow-x-auto px-4 pb-4">
+      <button @click="resetTweets(); selectedFeed = -1; saveSelectedFeed(); loadVisibleTweets(menu.sortField)" type="button"
         class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
         :class="selectedFeed === -1 ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'">
         Popular
@@ -1514,6 +1514,11 @@
                   class="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                   x-text="post.mediaType"></span>
               </td>
+              <td class="px-3 py-3">
+                <div class="line-clamp-4 whitespace-pre-wrap break-words" :title="likeTracker?.[post.uri]?.trackedLikeCount"
+                  x-text="likeTracker?.[post.uri]?.trackedLikeCount"></div>
+               
+              </td>
               <td class="px-3 py-3 text-gray-500 dark:text-gray-400" :title="formatSeenDate(post.createdAt)"
                 x-text="formatSeenDate(post.createdAt)"></td>
               <td class="px-3 py-3 text-gray-500 dark:text-gray-400" :title="formatSeenDate(post.viewedAt)"
@@ -1609,6 +1614,8 @@
         seenPostsColumns: [
           { key: "poster", label: "Poster", className: "w-40" },
           { key: "text", label: "Post", className: "w-72" },
+          { key: "currentLikes", label: "Likes", className: "w-20" },
+
           { key: "createdAt", label: "Posted", className: "w-40" },
           { key: "viewedAt", label: "Viewed", className: "w-40" },
           { key: "uri", label: "URI", className: "w-52" },

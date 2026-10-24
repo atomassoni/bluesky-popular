@@ -1649,6 +1649,13 @@
           });
         },
         websocket: null,
+        jetstreamRetryTimer: null,
+        jetstreamWatchdog: null,
+        jetstreamRetryCount: 0,
+        jetstreamHostIndex: Math.floor(Math.random() * 2),
+        jetstreamLastMessageAt: 0,
+        jetstreamStopped: false,
+        jetstreamResumeHandler: null,
         observer: null,
         seenPostsRecordedThisPage: new Set(),
         likeTracker: {},
@@ -1739,6 +1746,12 @@
 
         },
         destroy() {
+          this.jetstreamStopped = true;
+          clearTimeout(this.jetstreamRetryTimer);
+          this.stopJetstreamSocket();
+          document.removeEventListener('visibilitychange', this.jetstreamResumeHandler);
+          window.removeEventListener('focus', this.jetstreamResumeHandler);
+          window.removeEventListener('online', this.jetstreamResumeHandler);
           this.seenPostsSubscription?.unsubscribe();
           clearTimeout(this.storageStateTimer);
         },
@@ -1780,10 +1793,10 @@
             this.tweets = [tweet];
             await this.loadVideoInLikeTracker(postUri);
 
-            this.$nextTick(() => {
-              this.postIntersectionObserver(document.querySelectorAll('.post'));
-              this.videoIntersectionObserver(document.querySelectorAll('.f-video'));
-            });
+            // this.$nextTick(() => {
+            //   this.postIntersectionObserver(document.querySelectorAll('.post'));
+            //   this.videoIntersectionObserver(document.querySelectorAll('.f-video'));
+            // });
           } catch (error) {
             console.error("Unable to load post from postUri", error);
             this.tweets = [];
@@ -2258,10 +2271,10 @@
           }
           this.tweets = newTweets
 
-          this.$nextTick(() => {
-            this.postIntersectionObserver(document.querySelectorAll('.post'))
-            this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
-          })
+          // this.$nextTick(() => {
+          //   this.postIntersectionObserver(document.querySelectorAll('.post'))
+          //   this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
+          // })
 
         },
         markerClick(event, chartContext, opts, tweets) {
@@ -2585,34 +2598,71 @@
 
 
         },
-        startWebsocket(q) {
-          const queryString = window.location.search;
-          const urlParams = new URLSearchParams(queryString);
-          const wantedCollections = urlParams.get("q") || 'app.bsky.feed.like'
-          // console.log({ wantedCollections })
-          if (this.websocket) {
-            this.websocket.close();
+        stopJetstreamSocket() {
+          clearInterval(this.jetstreamWatchdog);
+          this.jetstreamWatchdog = null;
+          const socket = this.websocket;
+          this.websocket = null;
+          if (socket) {
+            socket.onopen = null;
+            socket.onmessage = null;
+            socket.onclose = null;
+            socket.onerror = null;
+            socket.close();
           }
-          const allJetstreams = ["jetstream1.us-east.bsky.network", "jetstream2.us-east.bsky.network", "jetstream1.us-west.bsky.network", "jetstream2.us-west.bsky.network"]
-          this.websocket = new WebSocket(
-            `wss://${allJetstreams[Math.floor(Math.random() * 4)]}/subscribe\?wantedCollections=${wantedCollections}`
-          );
-
-          this.websocket.onopen = () => {
-            setInterval(() => {
-              this.websocket?.send(JSON.stringify({ ping: "pong" }));
-            }, 40_000);
+        },
+        scheduleJetstreamReconnect(socket, reason) {
+          if (this.jetstreamStopped || this.websocket !== socket) return;
+          console.warn('[Jetstream] reconnecting', { url: socket.url, ...reason });
+          this.stopJetstreamSocket();
+          clearTimeout(this.jetstreamRetryTimer);
+          const delay = Math.min(30000, 1000 * 2 ** Math.min(this.jetstreamRetryCount++, 5));
+          this.jetstreamHostIndex++;
+          this.jetstreamRetryTimer = setTimeout(() => {
+            this.jetstreamRetryTimer = null;
+            this.startWebsocket();
+          }, delay * (0.8 + Math.random() * 0.4));
+        },
+        startWebsocket() {
+          if (this.jetstreamStopped) return;
+          // Focus and visibility can fire together; keep a healthy connection.
+          if (this.websocket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(this.websocket.readyState)) return;
+          clearTimeout(this.jetstreamRetryTimer);
+          this.jetstreamRetryTimer = null;
+          this.stopJetstreamSocket();
+          const wantedCollections = new URLSearchParams(window.location.search).get('q') || 'app.bsky.feed.like';
+          const hosts = ['jetstream.us-east.bsky.network', 'jetstream.us-west.bsky.network'];
+          const host = hosts[this.jetstreamHostIndex % hosts.length];
+          const socket = new WebSocket(`wss://${host}/subscribe?${new URLSearchParams({ wantedCollections })}`);
+          this.websocket = socket;
+          const startedAt = Date.now();
+          let openedAt = 0;
+          this.jetstreamLastMessageAt = startedAt;
+          console.info('[Jetstream] connecting', socket.url);
+          // Browsers handle protocol ping/pong; do not send JSON as a heartbeat.
+          this.jetstreamWatchdog = setInterval(() => {
+            if (this.websocket !== socket || document.visibilityState !== 'visible') return;
+            const timeout = socket.readyState === WebSocket.CONNECTING ? 15000 : 10000;
+            if (Date.now() - this.jetstreamLastMessageAt > timeout) {
+              this.scheduleJetstreamReconnect(socket, { reason: 'Connection timed out or stream idle', timeout });
+            }
+          }, 1000);
+          socket.onopen = () => {
+            if (this.websocket !== socket) return;
+            openedAt = Date.now();
+            this.jetstreamLastMessageAt = openedAt;
+            console.info('[Jetstream] connected', socket.url);
           };
-
-          this.websocket.onclose = (event) => {
-            // console.log(event);
+          socket.onclose = event => {
+            this.scheduleJetstreamReconnect(socket, { code: event.code, reason: event.reason, wasClean: event.wasClean });
           };
-
-          this.websocket.onerror = (error) => {
-            console.error(error);
+          socket.onerror = error => {
+            if (this.websocket === socket) console.error('[Jetstream] socket error', socket.url, error);
           };
-
-          this.websocket.onmessage = async (event) => {
+          socket.onmessage = async (event) => {
+            if (this.websocket !== socket) return;
+            this.jetstreamLastMessageAt = Date.now();
+            if (openedAt && Date.now() - openedAt > 30000) this.jetstreamRetryCount = 0;
             // const event = JSON.parse(event)
             // console.log(event)
             const data = JSON.parse(event.data);
@@ -2774,18 +2824,19 @@
           };
         },
         addVisibilityListeners() {
-          document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible") {
-              // console.log("Page is visible, restarting WebSocket...");
+          if (this.jetstreamResumeHandler) return;
+          this.jetstreamResumeHandler = () => {
+            if (document.visibilityState !== 'visible' || this.jetstreamStopped) return;
+            const socket = this.websocket;
+            if (socket && Date.now() - this.jetstreamLastMessageAt > 10000) {
+              this.scheduleJetstreamReconnect(socket, { reason: 'Stale connection on resume' });
+            } else if (!this.jetstreamRetryTimer) {
               this.startWebsocket();
             }
-          });
-
-          // Event listener for window focus
-          window.addEventListener("focus", () => {
-            // console.log("Window focused, restarting WebSocket...");
-            this.startWebsocket();
-          });
+          };
+          document.addEventListener('visibilitychange', this.jetstreamResumeHandler);
+          window.addEventListener('focus', this.jetstreamResumeHandler);
+          window.addEventListener('online', this.jetstreamResumeHandler);
         },
         async transformPost(post, postorder, authorSave = {}, verifiersSave = [], reason = null) {
           const { author, record, hasAuthorThread, likeCount, replyCount, quoteCount, repostCount, bookmarkCount, labels, uri, cid, viewer } = post || {}

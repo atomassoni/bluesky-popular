@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -216,7 +217,7 @@
           x-cloak>
           <ul class="py-1">
             <li>
-              <p @click="toggleSortOrder(); loadVisibleTweets(sortField); open = false"
+              <p @click="toggleSortOrder(); loadVisibleTweets(menu.sortField); open = false"
                 class="flex items-center justify-between px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :class="{ 'bg-gray-100 dark:bg-gray-700': menu.selectedSort === 'popularity' }">
                 Sort By Popularity
@@ -354,8 +355,8 @@
     </div>
 
     <div x-cloak x-show="feeds?.length" class="flex gap-2 overflow-x-auto px-4 pb-4">
-      <button @click="resetTweets(); selectedFeed = -1; saveSelectedFeed(); loadVisibleTweets(menu.sortField)" type="button"
-        class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
+      <button @click="resetTweets(); selectedFeed = -1; saveSelectedFeed(); loadVisibleTweets(menu.sortField)"
+        type="button" class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
         :class="selectedFeed === -1 ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'">
         Popular
       </button>
@@ -611,7 +612,7 @@
             </article>
           </div>
         </div>
-        <template x-for="(tweet, index) in searchedTweets" :key="tweet.cid">
+        <template x-for="(tweet, index) in searchedTweets" :key="tweet.uri || tweet.link">
           <!-- start of tweet div -->
           <div class="post relative rounded-xl transition duration-300" :data-uri="tweet.uri || tweet.link"
             :class="isUnseenPost(tweet.uri || tweet.link) ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-white dark:ring-amber-500 dark:ring-offset-gray-900' : ''"
@@ -707,7 +708,8 @@
                 <template x-for="image in tweet.images" :key="image.src">
                   <div class="relative mt-2">
                     <a :href="tweet.postUrl" target="_blank" class="block">
-                      <img :src="image.src" :alt="image.alt"
+                      <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
+                        :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
                         @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                         class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                     </a>
@@ -721,8 +723,11 @@
               </div>
               <!-- Video -->
               <div class="mt-2" x-show="tweet.video">
-                <video :src="tweet.video" controls loop muted
-                  class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
+                <video x-data="videoPlayback()"
+                  x-effect="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  @loadeddata="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  playsinline :src="tweet.video" :style="{ aspectRatio: tweet.mediaAspectRatio || '16 / 9' }" controls loop
+                  muted class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
                   Your browser does not support the video tag.
                 </video>
               </div>
@@ -782,7 +787,8 @@
                     <div class="mt-2 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
                       <template x-for="image in tweet.quotePost.images" :key="image.src">
                         <div class="relative mt-2">
-                          <img :src="image.src" :alt="image.alt"
+                          <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
+                            :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
                             @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           <button x-show="image.alt" x-cloak type="button"
@@ -797,7 +803,11 @@
                     </div>
                     <!-- Video -->
                     <div class="mt-2" x-show="tweet.quotePost.video">
-                      <video :src="tweet.quotePost.video" controls loop muted
+                      <video x-data="videoPlayback()"
+                  x-effect="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  @loadeddata="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  playsinline :src="tweet.quotePost.video"
+                        :style="{ aspectRatio: tweet.quotePost.mediaAspectRatio || '16 / 9' }" controls loop muted
                         class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto f-video">
                         Your browser does not support the video tag.
                       </video>
@@ -922,7 +932,7 @@
         <!-- Replies -->
         <ul x-show="!loadingReplies" class="max-h-80 overflow-y-auto pr-1 divide-y divide-gray-200 dark:divide-gray-700"
           @scroll="maybeLoadMore($el)">
-          <template x-for="tweet in replies" :key="tweet.cid">
+          <template x-for="tweet in replies" :key="tweet.uri || tweet.link">
             <li class="py-2">
               <template x-if="tweet.repostInfo">
                 <div class="mb-1.5 flex items-center gap-1.5 px-2 text-xs text-gray-500 dark:text-gray-400">
@@ -972,7 +982,8 @@
                     <template x-for="image in tweet.images" :key="image.src">
                       <div class="relative mt-2">
                         <a :href="tweet.postUrl" target="_blank" class="block mt-2">
-                          <img :src="image.src" :alt="image.alt"
+                          <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
+                            :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
                             @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           <button x-show="image.alt" x-cloak type="button"
@@ -988,8 +999,11 @@
                   </div>
                   <!-- active reply main video -->
                   <div class="mt-1.5" x-show="tweet.video">
-                    <video :src="tweet.video" controls loop muted
-                      class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                    <video x-data="videoPlayback()"
+                  x-effect="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  @loadeddata="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  playsinline :src="tweet.video" :style="{ aspectRatio: tweet.mediaAspectRatio || '16 / 9' }" controls loop
+                      muted class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                       Your browser does not support the video tag.
                     </video>
                   </div>
@@ -1042,7 +1056,8 @@
                         <div class="mt-1.5 space-y-2" x-show="tweet.quotePost?.images?.length > 0">
                           <template x-for="image in tweet.quotePost.images" :key="image.src">
                             <div class="relative mt-2">
-                              <img :src="image.src" :alt="image.alt"
+                              <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
+                                :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
                                 @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                                 class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                               <button x-show="image.alt" x-cloak type="button"
@@ -1056,7 +1071,11 @@
                         </div>
                         <!-- quote post active reply video -->
                         <div class="mt-1.5" x-show="tweet.quotePost.video">
-                          <video :src="tweet.quotePost.video" controls loop muted
+                          <video x-data="videoPlayback()"
+                  x-effect="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  @loadeddata="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  playsinline :src="tweet.quotePost.video"
+                            :style="{ aspectRatio: tweet.quotePost.mediaAspectRatio || '16 / 9' }" controls loop muted
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                             Your browser does not support the video tag.
                           </video>
@@ -1101,31 +1120,31 @@
                     <span>Saves: <span x-text="tweet.bookmarkCount"></span></span>
                     <span>Reposts: <span x-text="tweet.repostCount"></span></span>
                   </p>
-                   <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+                  <button x-show="tweet.replyCount > 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadReplies(tweet.uri); showModalReplies = true">
-                      View replies
-                    </button>
-                      <button x-show="tweet.quoteCount> 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+                    View replies
+                  </button>
+                  <button x-show="tweet.quoteCount> 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadQuotes(tweet.uri); showModalReplies = true">
-                      View quotes
-                    </button>
-                    <!-- "view thread" button -->
-                    <button x-show="tweet.hasAuthorThread" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+                    View quotes
+                  </button>
+                  <!-- "view thread" button -->
+                  <button x-show="tweet.hasAuthorThread" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
            dark:hover:bg-gray-600 dark:hover:border-gray-500
            transition" @click="loadAuthorThread(tweet.uri); showModalReplies = true">
-                      View thread
-                    </button>
+                    View thread
+                  </button>
                 </div>
               </template>
 
@@ -1146,7 +1165,7 @@
                       </span>
                       <span class="text-sm text-gray-500 dark:text-gray-400" x-text="'@' + tweet.handle"></span>
                     </p>
-                    <p class="text-sm text-gray-400"  x-text="formatDistance(new Date(tweet.createdAt))"></p>
+                    <p class="text-sm text-gray-400" x-text="formatDistance(new Date(tweet.createdAt))"></p>
 
                     <a :href="tweet.postUrl" target="_blank"
                       class="block mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap hover:underline"
@@ -1157,7 +1176,8 @@
                         <div class="relative mt-2">
 
                           <a :href="tweet.postUrl" target="_blank" class="block mt-2">
-                            <img :src="image.src" :alt="image.alt"
+                            <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
+                              :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
                               @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                               class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
                             <button x-show="image.alt" x-cloak type="button"
@@ -1172,8 +1192,11 @@
                     </div>
                     <!-- non-active reply main video -->
                     <div class="mt-1.5" x-show="tweet.video">
-                      <video :src="tweet.video" controls loop muted
-                        class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
+                      <video x-data="videoPlayback()"
+                  x-effect="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  @loadeddata="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  playsinline :src="tweet.video" :style="{ aspectRatio: tweet.mediaAspectRatio || '16 / 9' }" controls
+                        loop muted class="border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                         Your browser does not support the video tag.
                       </video>
                     </div>
@@ -1226,7 +1249,8 @@
                             <template x-for="image in tweet.quotePost.images" :key="image.src">
                               <div class="relative mt-2">
 
-                                <img :src="image.src" :alt="image.alt"
+                                <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
+                                  :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
                                   @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                                   class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                                 <button x-show="image.alt" x-cloak type="button"
@@ -1240,7 +1264,11 @@
                           </div>
                           <!-- non active reply quote post video -->
                           <div class="mt-1.5" x-show="tweet.quotePost.video">
-                            <video :src="tweet.quotePost.video" controls loop muted
+                            <video x-data="videoPlayback()"
+                  x-effect="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  @loadeddata="updateVideoPlayback($el, videoInView, menu.autoPlayVideo)"
+                  playsinline :src="tweet.quotePost.video"
+                              :style="{ aspectRatio: tweet.quotePost.mediaAspectRatio || '16 / 9' }" controls loop muted
                               class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto r-video">
                               Your browser does not support the video tag.
                             </video>
@@ -1293,7 +1321,7 @@
            transition" @click="loadReplies(tweet.uri); showModalReplies = true">
                       View replies
                     </button>
-                      <button x-show="tweet.quoteCount> 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
+                    <button x-show="tweet.quoteCount> 0" class="px-3 py-1.5 mt-1.5 text-sm rounded-md
            bg-gray-100 text-gray-800 border border-gray-300
            hover:bg-gray-200 hover:border-gray-400
            dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600
@@ -1515,9 +1543,10 @@
                   x-text="post.mediaType"></span>
               </td>
               <td class="px-3 py-3">
-                <div class="line-clamp-4 whitespace-pre-wrap break-words" :title="likeTracker?.[post.uri]?.trackedLikeCount"
-                  x-text="likeTracker?.[post.uri]?.trackedLikeCount"></div>
-               
+                <div class="line-clamp-4 whitespace-pre-wrap break-words"
+                  :title="likeTracker?.[post.uri]?.trackedLikeCount" x-text="likeTracker?.[post.uri]?.trackedLikeCount">
+                </div>
+
               </td>
               <td class="px-3 py-3 text-gray-500 dark:text-gray-400" :title="formatSeenDate(post.createdAt)"
                 x-text="formatSeenDate(post.createdAt)"></td>
@@ -1583,7 +1612,29 @@
       </svg>
     `)}`;
 
+    function videoPlayback() {
+      let observer;
+      return {
+        videoInView: false,
+        init() {
+          observer = new IntersectionObserver(entries => {
+            for (const entry of entries) {
+              this.videoInView = entry.isIntersecting && entry.intersectionRatio >= 0.5;
+            }
+          }, { threshold: [0, 0.5] });
+          observer.observe(this.$el);
+        },
+        destroy() {
+          observer?.disconnect();
+          this.$el.pause();
+        },
+      };
+    }
+
     function tweetFeed() {
+      const videoLoads = new Map();
+      const threadChecks = new Map();
+      let postPublication = Promise.resolve();
       return {
         fallbackAvatar,
         tweets: [],
@@ -1642,6 +1693,10 @@
           const direction = this.seenPostsSortDirection === "asc" ? 1 : -1;
           const field = this.seenPostsSort;
           return filtered.sort((left, right) => {
+            if (field === "currentLikes") {
+              return ((Number(this.likeTracker?.[left.uri]?.trackedLikeCount) || 0)
+                - (Number(this.likeTracker?.[right.uri]?.trackedLikeCount) || 0)) * direction;
+            }
             if (field === "createdAt" || field === "viewedAt") {
               return ((new Date(left[field] || 0).getTime()) - (new Date(right[field] || 0).getTime())) * direction;
             }
@@ -1955,20 +2010,14 @@
           localStorage.setItem("menu", menuString)
 
         },
-        videoIntersectionObserver(elements) {
-          const observer = new IntersectionObserver((entries, _observer) => {
-            entries.forEach((entry) => {
-
-              if (entry.isIntersecting && this.menu.autoPlayVideo) {
-                entry.target.play();
-              } else if (!entry.isIntersecting) {
-                entry.target.pause();
-              }
-            })
-          }, {
-            threshold: 1.0,
-          })
-          elements.forEach(el => observer.observe(el))
+        updateVideoPlayback(video, inView, enabled) {
+          if (enabled && inView && video.readyState >= 2) {
+            video.play()?.catch(() => {
+              // The browser can deny autoplay; manual controls remain available.
+            });
+          } else if (!enabled || !inView) {
+            video.pause();
+          }
         },
         postIntersectionObserver(elements) {
           elements.forEach(el => this.observer?.unobserve(el))
@@ -2033,23 +2082,36 @@
           });
         },
         async loadTrackedVideo(target, uri, label) {
+          if (!target) return;
           const { video, videoLink, videoLoading } = target
           if (!videoLink || video || videoLoading) return
 
           const [_, __, repo] = uri.split("/")
 
+          const poster = target.images;
           try {
             target.videoLoading = true
             target.images = [{
-              src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='1' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='.35' stroke-linecap='round' stroke-dasharray='4 2'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 8 4.5' to='360 8 4.5' dur='.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E",
-              alt: ""
-            }]
-
-            const videoBlob = await this.loadBlob('videos', videoLink, repo)
-            target.video = URL.createObjectURL(videoBlob);
+              ...poster?.[0],
+              src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='1' fill='none' stroke='%23fff' stroke-width='.35' stroke-linecap='round' stroke-dasharray='4 2'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 8 4.5' to='360 8 4.5' dur='.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E",
+              alt: "Loading video",
+            }];
+            // Share the URL across feed and quote instances of the same video.
+            const key = `${repo}/${videoLink}`;
+            if (!videoLoads.has(key)) {
+              const pending = this.loadBlob('videos', videoLink, repo)
+                .then(blob => URL.createObjectURL(blob))
+                .catch(error => {
+                  videoLoads.delete(key);
+                  throw error;
+                });
+              videoLoads.set(key, pending);
+            }
+            target.video = await videoLoads.get(key);
             target.images = []
             // console.log(`loaded ${label}`, target)
           } catch (err) {
+            target.images = poster;
             console.error(err)
           } finally {
             target.videoLoading = false
@@ -2059,7 +2121,7 @@
           const post = this.likeTracker[uri];
           await this.loadTrackedVideo(post, uri, 'video')
 
-          if (post.quotePost) {
+          if (post?.quotePost) {
             await this.loadTrackedVideo(post.quotePost, post.quotePost.uri, 'quote video')
           }
         },
@@ -2084,7 +2146,7 @@
             const { post, replies } = current;
             const replyCount = post?.replyCount;
             let gatheredReplies = replies;
-            //is this a bug or intentional to facillitate threading 
+            //is this a bug or intentional to facillitate threading
             if (!replies?.length && replyCount > 0) {
               const res = (await this.getPostThread(post.uri))
               gatheredReplies = res?.thread?.replies
@@ -2182,7 +2244,7 @@
             const res = await this.getPostThread(uri);
             // console.log({ postThread: res, uri });
             if (res.thread?.parent) {
-              //get all parents 
+              //get all parents
               this.getAllParents(res.thread.parent)
               // console.log({ parent })
             }
@@ -2244,38 +2306,30 @@
         },
         async doesPostHaveAuthorThread(uri) {
           try {
-          const { post, replies } = (await this.getPostThread(uri, 2))?.thread || {};
+            const { post, replies } = (await this.getPostThread(uri, 2))?.thread || {};
             return replies?.some(reply => reply.post.author.did == post.author.did)
           } catch (err) {
             console.error(err)
-            return 
+            return
           }
         },
-        async loadVisibleTweets(sortField) {
-          const newTweets = this.allPosts.sort((a, b) => sortPosts(a, b, sortField)).slice(0, Math.min(this.numToTrack, this.maxTweets));
-          const allHasAuthorThread = await Promise.allSettled(newTweets.map(tweet => this.doesPostHaveAuthorThread(tweet.uri)))
-          // console.log({ newTweets })
-          for (let index = 0; index < newTweets.length; index++) {
-            const { link: uri, quotePost } = newTweets[index];
-            await this.loadVideoInLikeTracker(uri);
-            const currentTweetIndex = newTweets.findIndex(t => t.link == uri);
-            if (currentTweetIndex !== -1 && this.likeTracker[uri]) {
-              newTweets[index] = {
-                ...newTweets[index],
-                ...this.likeTracker[uri],
-              };
+        loadVisibleTweets(sortField = this.menu.sortField) {
+          // Publish the current selection before any network work. A slow media
+          // request must never publish an older snapshot over a newer selection.
+          const selected = [...this.allPosts]
+            .sort((a, b) => sortPosts(a, b, sortField))
+            .slice(0, Math.min(this.numToTrack, this.maxTweets));
+          this.tweets = selected.map(tweet => this.likeTracker[tweet.uri || tweet.link] || tweet);
+          for (const tweet of this.tweets) {
+            const uri = tweet.uri || tweet.link;
+            this.loadVideoInLikeTracker(uri).catch(error => console.error(error));
+            if (!threadChecks.has(uri)) {
+              threadChecks.set(uri, this.doesPostHaveAuthorThread(uri));
             }
-            newTweets[index].hasAuthorThread = allHasAuthorThread[index]?.status === 'fulfilled'
-              ? allHasAuthorThread[index].value
-              : false
+            threadChecks.get(uri).then(hasThread => {
+              tweet.hasAuthorThread = hasThread;
+            });
           }
-          this.tweets = newTweets
-
-          // this.$nextTick(() => {
-          //   this.postIntersectionObserver(document.querySelectorAll('.post'))
-          //   this.videoIntersectionObserver(document.querySelectorAll('.f-video'))
-          // })
-
         },
         markerClick(event, chartContext, opts, tweets) {
           const showOnly = this.allPosts[opts.seriesIndex];
@@ -2351,7 +2405,7 @@
             return;
           }
           this.seenPostsSort = field;
-          this.seenPostsSortDirection = field === "createdAt" || field === "viewedAt" ? "desc" : "asc";
+          this.seenPostsSortDirection = field === "currentLikes" || field === "createdAt" || field === "viewedAt" ? "desc" : "asc";
         },
         async deleteSeenPost(uri) {
           await window.seenPostsStorage.delete(uri);
@@ -2556,7 +2610,7 @@
           if (!record) return;
           if (labels.length) {
             for (const { val } of labels) {
-              ///this will count every like 
+              ///this will count every like
               if (!this.labelTracker[val]) {
                 this.labelTracker[val] = 0;
                 this.labels.push(val)
@@ -2568,7 +2622,7 @@
           }
           const { handle, avatar, displayName, did } = author || {};
           let authorSave = await db.authors.get(did)
-          //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe? 
+          //todo cache posts/videos/images but remove on load if anything is older than 24 or 48 hours maybe?
           if (!authorSave) { //refresh time over 24 hours ago
             const authorProfile = await this.getProfile(repo);
             // console.log({ authorProfile })
@@ -2646,6 +2700,33 @@
             if (Date.now() - this.jetstreamLastMessageAt > timeout) {
               this.scheduleJetstreamReconnect(socket, { reason: 'Connection timed out or stream idle', timeout });
             }
+            const trackedPosts = Object.entries(this.likeTracker)
+              .map(([link, record]) => ({
+                link,
+                ...record,
+
+              }));
+
+            let tweets = trackedPosts
+              .filter((r) => r.content)
+              .map(tweet => ({ ...tweet, likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
+
+            const allPosts = this.filterPosts(tweets);
+            this.allPosts = allPosts;
+            this.trackedLength = tweets.length;
+
+            if (this.showOnlyUri) {
+              this.tweets = [this.likeTracker[this.showOnlyUri]].filter(Boolean)
+            } else if (this.selectedFeed > -1) {
+              this.tweets = this.feeds[this.selectedFeed].posts
+            } else {
+              this.loadVisibleTweets(this.menu.sortField);
+
+            }
+
+            const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.handle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
+            // // console.log({ series })
+            this.chart.updateSeries(series);
           }, 1000);
           socket.onopen = () => {
             if (this.websocket !== socket) return;
@@ -2731,21 +2812,29 @@
             this.likeTracker[uri].likeCountHistory.push({ x: Date.now(), y: (this.likeTracker[uri].likeHistoryLength / this.numSeconds).toFixed(3) })
             if (!this.likeTracker[uri]?.content && this.likeTracker[uri].trackedLikeCount == this.postThreshold) {
               const [_, __, repo, collection, rkey] = uri.split("/");
+              // Reserve order when a post qualifies, before its media loads.
+              const postorder = this.postorder++;
+              const previousPublication = postPublication;
+              let finishPublication;
+              postPublication = new Promise(resolve => { finishPublication = resolve; });
               try {
                 const newTweet = await this.getPostExpanded(likeCid, uri);
+                await previousPublication;
                 if (!newTweet) return;
-                this.postorder++;
+                newTweet.postorder = postorder;
                 // if (newTweet.quotePost) // console.log({ newTweet })
                 if (this.likeTracker[uri]) {
-                  const { trackedLikeCount, timesUs } = this.likeTracker[uri];
                   this.likeTracker[uri] = {
+                    ...this.likeTracker[uri],
                     ...newTweet,
-                    trackedLikeCount,
-                    timesUs,
                   };
                 }
               } catch (err) {
                 console.error(err);
+              } finally {
+                // A failed post also releases its place, in qualification order.
+                await previousPublication;
+                finishPublication();
               }
 
             }
@@ -2757,51 +2846,6 @@
               this.dots = dots;
             }
 
-            if (
-              this.counter % 5000 == 0 ||
-              (this.counter < 10000 && this.counter % 1000 == 0)
-            ) {
-              const trackedPosts = Object.entries(this.likeTracker)
-                .map(([link, record]) => ({
-                  link,
-                  ...record,
-               
-                }));
-
-              let tweets = trackedPosts
-                .filter((r) => r.content)
-                .map(tweet => ({ ...tweet,  likeCountHistory: tweet.likeCountHistory?.filter(like => like.x > Date.now() - 60_000) || [] }));
-              // const dbput = tweets.map(t => ({ likeHistoryLength: t.likeHistoryLength, link: t.link, likesPerSecond: t.likesPerSecond, author: t.handle }))
-              // db.trackedLikes.bulkPut(dbput).then(() => {
-              //   // console.log("Done adding 100,000 raindrops all over the place");
-              // }).catch(error => {
-              //   if (error.name === "BulkError") {
-              //     // Explicitly catching the bulkAdd() operation makes those successful
-              //     // additions commit despite that there were errors.
-              //     console.error("Some raindrops did not succeed. However, " +
-              //       100000 - e.failures.length + " raindrops was added successfully");
-              //   } else {
-              //     console.error(error)
-              //     throw error; // we're only handling BulkError specifically here...
-              //   }
-              // });
-              const allPosts = this.filterPosts(tweets);
-              this.allPosts = allPosts;
-              this.trackedLength = tweets.length;
-
-              if (this.showOnlyUri) {
-                this.tweets = [this.likeTracker[this.showOnlyUri]].filter(Boolean)
-              } else if (this.selectedFeed > -1) {
-                this.tweets = this.feeds[this.selectedFeed].posts
-              } else {
-                this.loadVisibleTweets(this.menu.sortField);
-
-              }
-
-              const series = tweets.sort((a, b) => b.likesPerSecond - a.likesPerSecond).map(tweet => ({ name: tweet.handle, data: tweet.likeCountHistory })).filter(d => d.data).slice(0, 25)
-              // // console.log({ series })
-              this.chart.updateSeries(series);
-            }
 
             if (this.counter % 10000 == 0) {
               // console.log("this.counter", this.counter)
@@ -2844,30 +2888,7 @@
           const { handle, avatar, displayName } = author || {};
           const { embed, langs, reply } = record;
           const { like, bookmarked } = viewer || {};
-          /**
-           * {
-    "by": {
-        "did": "did:plc:vszw3ess46odfhnzdsy4huae",
-        "handle": "segyges.bsky.social",
-        "displayName": "SE Gyges",
-        "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:vszw3ess46odfhnzdsy4huae/bafkreiempgjkhvjq2dobqkmd5pqd6lcbkhgejasfwh3zoygncjpwgqc7te",
-        "associated": {
-            "chat": {
-                "allowIncoming": "all"
-            },
-            "activitySubscription": {
-                "allowSubscriptions": "followers"
-            }
-        },
-        "labels": [],
-        "createdAt": "2023-08-13T21:30:56.810Z"
-    },
-    "uri": "at://did:plc:vszw3ess46odfhnzdsy4huae/app.bsky.feed.repost/3mvvmf3o7d32y",
-    "cid": "bafyreictw36qzkaszgcnceclsfczotflwmoxqrkjltf6kxbrotugzuiqya",
-    "indexedAt": "2026-09-19T21:20:29.564Z",
-    "$type": "app.bsky.feed.defs#reasonRepost"
-}
-           **/
+
           const { $type } = reason || {};
           const repostInfo = $type == "app.bsky.feed.defs#reasonRepost" ? {
             ...reason.by
@@ -2876,7 +2897,7 @@
           let newTweet = {
             cid,
             uri,
-         
+
             likeCount,
             replyCount,
             quoteCount,
@@ -2903,7 +2924,6 @@
             const [_, __, repo, collection, rkey] = uri.split("/");
             newTweet = await this.loadParent(newTweet, parent.uri)
           }
-
 
           //get embeds async pull out?
           if (embed) {
@@ -2947,11 +2967,15 @@
             // console.log("video", { embed })
             newTweet.mediaType = "video";
             newTweet.videoLink = embed.video.ref.$link;
+            const { width = 16, height = 9 } = embed.aspectRatio || {};
+            newTweet.mediaAspectRatio = `${width} / ${height}`;
             newTweet.mediaAlt = embed.alt || "";
             newTweet.images = [
               {
                 src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='2' fill='%23fff' fill-opacity='.9'/%3E%3Cpath d='M7.4 3.3 9.3 4.5 7.4 5.7Z' fill='%23111827'/%3E%3C/svg%3E",
-                alt: ""
+                alt: "",
+                width,
+                height,
               }
             ];
           } else if (embed.$type.includes("embed.record")) {
@@ -3026,7 +3050,10 @@
                 img.image.ref.$link,
                 repo
               );
-              newTweet.images.push({ src: URL.createObjectURL(blob), alt: img.alt });
+              newTweet.images.push({
+                src: URL.createObjectURL(blob), alt: img.alt,
+                width: img.aspectRatio?.width, height: img.aspectRatio?.height,
+              });
             }
           } catch (err) {
             console.error("load images error", err, newTweet, embed, repo)

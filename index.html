@@ -614,7 +614,7 @@
         </div>
         <template x-for="(tweet, index) in searchedTweets" :key="tweet.uri || tweet.link">
           <!-- start of tweet div -->
-          <div class="post relative rounded-xl transition duration-300" :data-uri="tweet.uri || tweet.link"
+          <div x-data="postVisibility()" class="post relative rounded-xl transition duration-300" :data-uri="tweet.uri || tweet.link"
             :class="isUnseenPost(tweet.uri || tweet.link) ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-white dark:ring-amber-500 dark:ring-offset-gray-900' : ''"
             style="overflow-wrap: break-word;">
             <span x-show="isUnseenPost(tweet.uri || tweet.link)" x-cloak
@@ -709,7 +709,7 @@
                   <div class="relative mt-2">
                     <a :href="tweet.postUrl" target="_blank" class="block">
                       <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
-                        :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
+                        :style="{ aspectRatio: image.width && image.height ? image.width + ' / ' + image.height : null, backgroundColor: image.videoPlaceholder ? '#111827' : null, objectFit: image.videoPlaceholder ? 'contain' : null }"
                         @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                         class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                     </a>
@@ -788,7 +788,7 @@
                       <template x-for="image in tweet.quotePost.images" :key="image.src">
                         <div class="relative mt-2">
                           <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
-                            :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
+                            :style="{ aspectRatio: image.width && image.height ? image.width + ' / ' + image.height : null, backgroundColor: image.videoPlaceholder ? '#111827' : null, objectFit: image.videoPlaceholder ? 'contain' : null }"
                             @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           <button x-show="image.alt" x-cloak type="button"
@@ -983,7 +983,7 @@
                       <div class="relative mt-2">
                         <a :href="tweet.postUrl" target="_blank" class="block mt-2">
                           <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
-                            :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
+                            :style="{ aspectRatio: image.width && image.height ? image.width + ' / ' + image.height : null, backgroundColor: image.videoPlaceholder ? '#111827' : null, objectFit: image.videoPlaceholder ? 'contain' : null }"
                             @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                             class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                           <button x-show="image.alt" x-cloak type="button"
@@ -1057,7 +1057,7 @@
                           <template x-for="image in tweet.quotePost.images" :key="image.src">
                             <div class="relative mt-2">
                               <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
-                                :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
+                                :style="{ aspectRatio: image.width && image.height ? image.width + ' / ' + image.height : null, backgroundColor: image.videoPlaceholder ? '#111827' : null, objectFit: image.videoPlaceholder ? 'contain' : null }"
                                 @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                                 class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                               <button x-show="image.alt" x-cloak type="button"
@@ -1177,7 +1177,7 @@
 
                           <a :href="tweet.postUrl" target="_blank" class="block mt-2">
                             <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
-                              :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
+                              :style="{ aspectRatio: image.width && image.height ? image.width + ' / ' + image.height : null, backgroundColor: image.videoPlaceholder ? '#111827' : null, objectFit: image.videoPlaceholder ? 'contain' : null }"
                               @click.prevent.stop="loadTrackedVideo(tweet, tweet.uri, 'video')"
                               class="border border-gray-300 dark:border-gray-700 w-full h-auto" />
                             <button x-show="image.alt" x-cloak type="button"
@@ -1250,7 +1250,7 @@
                               <div class="relative mt-2">
 
                                 <img :src="image.src" :alt="image.alt" :width="image.width" :height="image.height"
-                                  :style="image.width && image.height ? { aspectRatio: image.width + ' / ' + image.height } : {}"
+                                  :style="{ aspectRatio: image.width && image.height ? image.width + ' / ' + image.height : null, backgroundColor: image.videoPlaceholder ? '#111827' : null, objectFit: image.videoPlaceholder ? 'contain' : null }"
                                   @click.prevent.stop="loadTrackedVideo(tweet.quotePost, tweet.quotePost.uri, 'quote video')"
                                   class="rounded-md border border-gray-300 dark:border-gray-700 w-full h-auto" />
                                 <button x-show="image.alt" x-cloak type="button"
@@ -1631,6 +1631,39 @@
       };
     }
 
+    function postVisibility() {
+      let intersectionObserver;
+      let resizeObserver;
+      let destroyed = false;
+      return {
+        init() {
+          this.$nextTick(() => {
+            if (destroyed) return;
+            const observe = () => {
+              const height = this.$el.getBoundingClientRect().height;
+              // Keep the observer threshold consistent with the scroll fallback,
+              // including the 120px cap on tall posts.
+              const threshold = height > 0 ? Math.min(0.15, 120 / height) : 0.15;
+              intersectionObserver?.disconnect();
+              intersectionObserver = new IntersectionObserver(() => {
+                this.markVisiblePostsSeen([this.$el]);
+              }, { threshold: [0, threshold] });
+              intersectionObserver.observe(this.$el);
+              this.markVisiblePostsSeen([this.$el]);
+            };
+            resizeObserver = new ResizeObserver(observe);
+            resizeObserver.observe(this.$el);
+            observe();
+          });
+        },
+        destroy() {
+          destroyed = true;
+          intersectionObserver?.disconnect();
+          resizeObserver?.disconnect();
+        },
+      };
+    }
+
     function tweetFeed() {
       const videoLoads = new Map();
       const threadChecks = new Map();
@@ -1848,10 +1881,6 @@
             this.tweets = [tweet];
             await this.loadVideoInLikeTracker(postUri);
 
-            // this.$nextTick(() => {
-            //   this.postIntersectionObserver(document.querySelectorAll('.post'));
-            //   this.videoIntersectionObserver(document.querySelectorAll('.f-video'));
-            // });
           } catch (error) {
             console.error("Unable to load post from postUri", error);
             this.tweets = [];
@@ -2019,22 +2048,6 @@
             video.pause();
           }
         },
-        postIntersectionObserver(elements) {
-          elements.forEach(el => this.observer?.unobserve(el))
-          this.observer = new IntersectionObserver((entries, _observer) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                const uri = entry.target.dataset.uri
-                if (!uri) return;
-                this.recordSeenPostOnce(uri)
-              }
-            })
-          }, {
-            threshold: 0.15,
-          })
-          elements.forEach(el => this.observer.observe(el))
-          this.markVisiblePostsSeen(elements)
-        },
         markVisiblePostsSeen(elements = document.querySelectorAll('.post')) {
           elements.forEach(element => {
             const uri = element.dataset.uri;
@@ -2094,7 +2107,8 @@
             target.images = [{
               ...poster?.[0],
               src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3Crect width='16' height='9' fill='%23111827'/%3E%3Ccircle cx='8' cy='4.5' r='1' fill='none' stroke='%23fff' stroke-width='.35' stroke-linecap='round' stroke-dasharray='4 2'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 8 4.5' to='360 8 4.5' dur='.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E",
-              alt: "Loading video",
+              alt: "",
+              videoPlaceholder: true,
             }];
             // Share the URL across feed and quote instances of the same video.
             const key = `${repo}/${videoLink}`;
@@ -2976,6 +2990,7 @@
                 alt: "",
                 width,
                 height,
+                videoPlaceholder: true,
               }
             ];
           } else if (embed.$type.includes("embed.record")) {

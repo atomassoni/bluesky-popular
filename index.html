@@ -1129,7 +1129,7 @@
                           <path d="M12 7v5l3 2" />
                         </svg>
                         <span class="min-w-0 text-[10px] leading-tight"
-                          x-text="formatDistance(new Date(tweet.createdAt))"></span>
+                          x-text="formatCompactAge(tweet.createdAt)"></span>
                       </div>
                       <div class="flex w-full items-center gap-1.5 rounded py-1 text-left tabular-nums"
                         :aria-label="'Likes: ' + (tweet.likeCount || 0)" :title="'Likes: ' + (tweet.likeCount || 0)">
@@ -2841,6 +2841,12 @@
         formatNum(n) {
           if (typeof n !== 'number') return '0';
           return new Intl.NumberFormat(undefined, { notation: 'compact' }).format(n);
+        },
+
+        formatCompactAge(isoLike) {
+          const units = { second: 's', minute: 'm', hour: 'h', day: 'd', month: 'mo', year: 'y' };
+          return formatDistance(new Date(isoLike))
+            .replace(/\s+(second|minute|hour|day|month|year)s?$/, (_, unit) => units[unit]);
         },
 
         formatDate(isoLike) {

@@ -378,7 +378,7 @@
             :title="`${dot.likeHistoryLength} likes`" :aria-label="`${dot.likeHistoryLength} likes`">
             <template x-for="count in dot.likeHistoryLength" :key="`${dot.link}-${count}`">
               <span class="h-1.5 w-1.5 rounded-full"
-                :class="dot.likeHistoryLength > 9 ? 'bg-yellow-400 dark:bg-yellow-300' : 'bg-sky-500 dark:bg-sky-400'"></span>
+                :class=getDotClass(dot)></span>
             </template>
           </div>
         </template>
@@ -3341,6 +3341,11 @@
             newTweet.external.hostname = new URL(uri).hostname;
           }
           return newTweet
+        },
+        async getDotClass(dot) {
+          const seenPost = await seenPostsStorage.get(dot.link)
+          if (seenPost) return 'bg-red-400 dark:bg-red-300'
+          return dot.likeHistoryLength > 9 ? 'bg-yellow-400 dark:bg-yellow-300' : 'bg-sky-500 dark:bg-sky-400'
         },
         async loadPostImages(newTweet, embed, repo) {
           newTweet.images = [];

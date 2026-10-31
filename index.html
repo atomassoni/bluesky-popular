@@ -89,6 +89,7 @@
         return { unsubscribe: () => seenPostsListeners.delete(listener) };
       },
     };
+    
     window.addEventListener('storage', event => {
       if (event.key === seenPostsStorageKey || event.key === null) notifySeenPostsListeners();
     });
@@ -1943,6 +1944,7 @@
         tweets: [],
         allPosts: [],
         seenPosts: [],
+        seenPostsIndex: new Set(),
         seenPostsLoaded: false,
         showSeenPostsPanel: false,
         seenPostsSearch: "",
@@ -2642,6 +2644,7 @@
           this.seenPostsSubscription?.unsubscribe();
           this.seenPostsSubscription = window.seenPostsStorage.subscribe(posts => {
             this.seenPosts = posts;
+            this.seenPostsIndex = new Set([...posts.map(post=>post.uri)])
             this.seenPostsLoaded = true;
             this.scheduleStorageStateRefresh();
           });
@@ -3343,7 +3346,7 @@
           return newTweet
         },
         async getDotClass(dot) {
-          const seenPost = await seenPostsStorage.get(dot.link)
+          const seenPost = this.seenPostsIndex.has(dot.link)
           if (seenPost) return 'bg-red-400 dark:bg-red-300'
           return dot.likeHistoryLength > 9 ? 'bg-yellow-400 dark:bg-yellow-300' : 'bg-sky-500 dark:bg-sky-400'
         },
